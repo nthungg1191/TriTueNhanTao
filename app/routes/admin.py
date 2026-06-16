@@ -9,7 +9,6 @@ from app.services.notification_service import NotificationService
 from datetime import date, datetime, time, timedelta
 import os
 import re
-import re
 import uuid
 import cv2
 import numpy as np

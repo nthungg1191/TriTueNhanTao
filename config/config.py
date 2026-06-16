@@ -1,5 +1,8 @@
 
 import os
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from datetime import timedelta
 from dotenv import load_dotenv
 

@@ -31,10 +31,12 @@ face_api = Blueprint('face_api', __name__, url_prefix='/api/face')
 
 @face_api.route('/recognize', methods=['POST'])
 def recognize_face():
+    logger.info(f"[FACE_RECOGNIZE] Request received")
     try:
         data = request.get_json()
         
         if not data:
+            logger.warning("[FACE_RECOGNIZE] No data provided")
             return jsonify({
                 'success': False,
                 'message': 'Không có dữ liệu'
@@ -43,25 +45,41 @@ def recognize_face():
         image_data = data.get('image')
         
         if not image_data:
+            logger.warning("[FACE_RECOGNIZE] No image data")
             return jsonify({
                 'success': False,
                 'message': 'Dữ liệu ảnh là bắt buộc'
             }), 400
         
+        logger.info(f"[FACE_RECOGNIZE] Image data length: {len(image_data)}")
+        
         # Decode image
         image = _decode_image(image_data)
         if image is None:
+            logger.warning("[FACE_RECOGNIZE] Failed to decode image")
             return jsonify({
                 'success': False,
                 'message': 'Dữ liệu ảnh không hợp lệ'
             }), 400
         
+        logger.info(f"[FACE_RECOGNIZE] Image decoded: shape={image.shape if image is not None else 'None'}")
+        
         # Check service availability
         if face_detector is None:
+            logger.error("[FACE_RECOGNIZE] face_detector is None - face_recognition module not loaded")
             return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
 
         # Process image for face detection
+        logger.info("[FACE_RECOGNIZE] Calling face_detector.process_image()")
         result = face_detector.process_image(image)
+        logger.info(f"[FACE_RECOGNIZE] Detection result: faces_found={result.get('faces_found')}")
+        
+        if result.get('error'):
+            logger.error(f"[FACE_RECOGNIZE] Detection error: {result.get('error')}")
+            return jsonify({
+                'success': False,
+                'message': f"Lỗi phát hiện khuôn mặt: {result.get('error')}"
+            }), 500
         
         if result['faces_found'] == 0:
             return jsonify({
@@ -77,10 +95,13 @@ def recognize_face():
         
         # Get face encoding
         face_encoding = result['face_encodings'][0]
+        logger.info(f"[FACE_RECOGNIZE] Got face encoding: shape={face_encoding.shape}")
         
         # Recognize employee using multi-embedding system
         face_service = FaceService(db.session)
+        logger.info("[FACE_RECOGNIZE] Calling face_service.recognize_employee_multi()")
         recognition_result = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+        logger.info(f"[FACE_RECOGNIZE] Recognition result: {recognition_result}")
 
         if recognition_result.get('success') and recognition_result.get('employee_code'):
             employee = Employee.query.filter_by(employee_code=recognition_result['employee_code']).first()
@@ -97,7 +118,9 @@ def recognize_face():
         return jsonify(recognition_result), 200
 
     except Exception as e:
-        logger.error(f'Lỗi nhận dạng khuôn mặt: {str(e)}')
+        import traceback
+        logger.error(f"[FACE_RECOGNIZE] EXCEPTION: {str(e)}")
+        logger.error(f"[FACE_RECOGNIZE] Traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'message': f'Nhận dạng thất bại: {str(e)}'

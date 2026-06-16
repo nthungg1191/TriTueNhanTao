@@ -1,6 +1,6 @@
 """Attendance model"""
 from app import db
-from datetime import datetime, time as dt_time
+from datetime import datetime, timezone, time as dt_time
 from math import ceil
 
 
@@ -26,8 +26,8 @@ class Attendance(db.Model):
     check_out_photo = db.Column(db.String(255), nullable=True)
     check_in_photo_2 = db.Column(db.String(255), nullable=True)
     check_out_photo_2 = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Composite index for faster queries
     __table_args__ = (

@@ -1,6 +1,6 @@
 """Employee model"""
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 import pickle
 
 
@@ -30,8 +30,8 @@ class Employee(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     hire_date = db.Column(db.Date, nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     attendances = db.relationship('Attendance', backref='employee', lazy='dynamic', cascade='all, delete-orphan')

@@ -545,8 +545,6 @@ class FaceService:
             except Exception:
                 pass
 
-            logger.info(f"Face embedding added for employee {employee_code} (variant: {variant_type})")
-            
             return {
                 'success': True,
                 'message': 'Face embedding added successfully',

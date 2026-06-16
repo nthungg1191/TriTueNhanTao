@@ -1,3 +1,0 @@
-id,employee_id,date,status,check_in_time,check_out_time,check_in_time_2,check_out_time_2,notes,schedule_id,shift_start,shift_end
-107,21,2026-05-08,late,2026-05-08 15:36:14,2026-05-08 15:36:48,,,,5,6:30:00,19:30:00
-106,18,2026-05-07,late,2026-05-07 22:22:38,2026-05-07 22:23:03,,,,4,6:00:00,20:00:00

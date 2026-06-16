@@ -1,7 +1,7 @@
 """
 Flask Application Factory
 """
-from flask import Flask
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -112,8 +112,7 @@ def register_blueprints(app):
 
 def register_error_handlers(app):
     """Register error handlers"""
-    from flask import render_template
-    
+
     @app.errorhandler(404)
     def not_found_error(error):
         return render_template('errors/404.html'), 404
