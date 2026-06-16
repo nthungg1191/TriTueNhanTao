@@ -1,0 +1,49 @@
+{% extends "layouts/admin_base.html" %}
+
+{% block title %}Migration Khuôn Mặt{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4 class="mb-0">Migration Khuôn Mặt - Legacy → Multi-Embedding</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info" style="background: #ecfeff; color: #0e7490; border-color: #a5f3fc;">
+                <strong>Thông tin Migration:</strong>
+                <ul class="mb-0">
+                    <li><strong>Khuôn mặt legacy (cần migrate):</strong> {{ legacy_count }}</li>
+                    <li><strong>Khuôn mặt multi-embedding (đã migrate):</strong> {{ multi_count }}</li>
+                </ul>
+            </div>
+
+            <div class="alert alert-warning" style="background: #fff7ed; color: #9a3412; border-color: #fed7aa;">
+                <strong>⚠️ Lưu ý:</strong>
+                <p class="mb-0">
+                    Hệ thống nhận diện khuôn mặt đã được cập nhật để sử dụng multi-embedding table. 
+                    Migration này sẽ sao chép các khuôn mặt cũ từ legacy table sang multi-embedding table, 
+                    đảm bảo tất cả nhân viên có thể chấm công được.
+                </p>
+            </div>
+
+            {% if legacy_count > 0 %}
+            <form method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn tiến hành migration? Quá trình này sẽ mất vài phút.');">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-sync"></i> Bắt đầu Migration
+                </button>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-arrow-left"></i> Quay lại
+                </a>
+            </form>
+            {% else %}
+            <div class="alert alert-success" style="background: #ecfdf5; color: #166534; border-color: #bbf7d0;">
+                <strong>✓ Hoàn tất!</strong> Không có khuôn mặt legacy nào cần migration.
+            </div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

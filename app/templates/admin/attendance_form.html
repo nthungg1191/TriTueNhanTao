@@ -24,17 +24,19 @@
 
     <div class="form-group">
         <label for="date">Ngày *</label>
-        <input type="date" 
-               name="date" 
-               id="date" 
-               class="form-control" 
-               value="{{ attendance.date.strftime('%Y-%m-%d') if attendance and attendance.date else today.strftime('%Y-%m-%d') }}" 
-               required>
+         <input type="text" 
+             name="date" 
+             id="date" 
+             class="form-control date-picker" 
+             placeholder="dd/mm/yyyy"
+             value="{{ request.form.get('date', attendance.date.strftime('%d/%m/%Y') if attendance and attendance.date else today.strftime('%d/%m/%Y')) }}" 
+             required>
+        <small class="form-text text-muted">Định dạng ngày: dd/mm/yyyy</small>
     </div>
 
     <div class="form-row">
         <div class="form-group">
-            <label for="check_in_time">Giờ check-in</label>
+            <label for="check_in_time">Giờ check-in sáng</label>
             <input type="datetime-local" 
                    name="check_in_time" 
                    id="check_in_time" 
@@ -44,13 +46,57 @@
         </div>
 
         <div class="form-group">
-            <label for="check_out_time">Giờ check-out</label>
+            <label for="check_out_time">Giờ check-out nghỉ trưa</label>
             <input type="datetime-local" 
                    name="check_out_time" 
                    id="check_out_time" 
                    class="form-control"
                    value="{% if attendance and attendance.check_out_time %}{{ attendance.check_out_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
             <small class="form-text text-muted">Để trống nếu chưa check-out</small>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="check_in_time_2">Giờ check-in chiều</label>
+            <input type="datetime-local" 
+                   name="check_in_time_2" 
+                   id="check_in_time_2" 
+                   class="form-control"
+                   value="{% if attendance and attendance.check_in_time_2 %}{{ attendance.check_in_time_2.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <small class="form-text text-muted">Giờ quay lại làm việc sau nghỉ trưa</small>
+        </div>
+
+        <div class="form-group">
+            <label for="check_out_time_2">Giờ check-out tan ca</label>
+            <input type="datetime-local" 
+                   name="check_out_time_2" 
+                   id="check_out_time_2" 
+                   class="form-control"
+                   value="{% if attendance and attendance.check_out_time_2 %}{{ attendance.check_out_time_2.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <small class="form-text text-muted">Giờ kết thúc ngày làm việc</small>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="overtime_check_in_time">Giờ check-in tăng ca</label>
+            <input type="datetime-local"
+                   name="overtime_check_in_time"
+                   id="overtime_check_in_time"
+                   class="form-control"
+                   value="{% if attendance and attendance.overtime_check_in_time %}{{ attendance.overtime_check_in_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <small class="form-text text-muted">Dùng khi có phiên OT (17:30+)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="overtime_check_out_time">Giờ check-out tăng ca</label>
+            <input type="datetime-local"
+                   name="overtime_check_out_time"
+                   id="overtime_check_out_time"
+                   class="form-control"
+                   value="{% if attendance and attendance.overtime_check_out_time %}{{ attendance.overtime_check_out_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+            <small class="form-text text-muted">Dùng khi có phiên OT (kết thúc OT)</small>
         </div>
     </div>
 
@@ -61,6 +107,8 @@
             <option value="late" {% if attendance and attendance.status == 'late' %}selected{% endif %}>Đi muộn</option>
             <option value="absent" {% if attendance and attendance.status == 'absent' %}selected{% endif %}>Vắng mặt</option>
             <option value="early_leave" {% if attendance and attendance.status == 'early_leave' %}selected{% endif %}>Về sớm</option>
+            <option value="missing_check_in" {% if attendance and attendance.status == 'missing_check_in' %}selected{% endif %}>Thiếu check-in</option>
+            <option value="missing_check_out" {% if attendance and attendance.status == 'missing_check_out' %}selected{% endif %}>Thiếu check-out</option>
         </select>
         <small class="form-text text-muted">Trạng thái sẽ được tự động tính toán nếu để mặc định</small>
     </div>
@@ -74,20 +122,23 @@
                    class="form-control" 
                    step="0.1"
                    value="{{ attendance.working_hours if attendance and attendance.working_hours else '' }}"
-                   placeholder="Tự động tính">
+                   placeholder="Tự động tính"
+                   readonly>
             <small class="form-text text-muted">Số giờ làm việc (tự động tính nếu có check-in và check-out)</small>
         </div>
 
         <div class="form-group">
-            <label for="overtime_hours">Giờ làm thêm</label>
-            <input type="number" 
-                   name="overtime_hours" 
-                   id="overtime_hours" 
-                   class="form-control" 
+            <label for="overtime_hours_display">Giờ làm thêm</label>
+            <input type="number"
+                   id="overtime_hours_display"
+                   class="form-control"
                    step="0.1"
-                   value="{{ attendance.overtime_hours if attendance and attendance.overtime_hours else '' }}"
-                   placeholder="Tự động tính">
-            <small class="form-text text-muted">Số giờ làm thêm (tự động tính nếu > 8h)</small>
+                   value=""
+                   placeholder="Tự động tính"
+                   readonly>
+            <!-- Hidden field named overtime_hours must be submitted (keeps backward compatibility: stores OT points) -->
+            <input type="hidden" name="overtime_hours" id="overtime_hours" value="{{ attendance.overtime_hours if attendance and attendance.overtime_hours else '' }}">
+            <small class="form-text text-muted">Số giờ làm thêm (tự động tính theo giờ kiểm tăng ca). Công OT: <span id="overtime_points_display">{{ attendance.overtime_hours if attendance and attendance.overtime_hours else '' }}</span></small>
         </div>
     </div>
 
@@ -112,29 +163,102 @@
 document.addEventListener('DOMContentLoaded', function() {
     const checkInInput = document.getElementById('check_in_time');
     const checkOutInput = document.getElementById('check_out_time');
+    const checkInInput2 = document.getElementById('check_in_time_2');
+    const checkOutInput2 = document.getElementById('check_out_time_2');
+    const overtimeCheckInInput = document.getElementById('overtime_check_in_time');
+    const overtimeCheckOutInput = document.getElementById('overtime_check_out_time');
     const workingHoursInput = document.getElementById('working_hours');
+    // Visible display (hours) and hidden submitted value (OT points)
+    const overtimeDisplayInput = document.getElementById('overtime_hours_display');
+    const overtimeHiddenInput = document.getElementById('overtime_hours');
+    const overtimePointsDisplay = document.getElementById('overtime_points_display');
     const dateInput = document.getElementById('date');
     
-    // Auto-calculate working hours when both times are set
+    // Auto-calculate working hours when available punches are set
     function calculateWorkingHours() {
-        if (checkInInput.value && checkOutInput.value) {
-            const checkIn = new Date(checkInInput.value);
-            const checkOut = new Date(checkOutInput.value);
-            
-            if (checkOut > checkIn) {
-                const diffMs = checkOut - checkIn;
-                const diffHours = diffMs / (1000 * 60 * 60);
-                workingHoursInput.value = diffHours.toFixed(2);
-                
-                // Auto-calculate overtime (assuming 8-hour workday)
-                const overtimeInput = document.getElementById('overtime_hours');
-                if (diffHours > 8) {
-                    overtimeInput.value = (diffHours - 8).toFixed(2);
-                } else {
-                    overtimeInput.value = '';
+        const punches = [
+            [checkInInput.value, checkOutInput.value],
+            [checkInInput2.value, checkOutInput2.value],
+        ];
+        let totalHours = 0;
+
+        punches.forEach(([checkInValue, checkOutValue]) => {
+            if (checkInValue && checkOutValue) {
+                const checkIn = new Date(checkInValue);
+                const checkOut = new Date(checkOutValue);
+                if (checkOut > checkIn) {
+                    totalHours += (checkOut - checkIn) / (1000 * 60 * 60);
                 }
             }
+        });
+
+        // Cap administrative working hours at 8.0 (standard 8-hour workday)
+        // This matches the backend calculation to prevent inflated hours
+        if (totalHours > 0) {
+            totalHours = Math.min(totalHours, 8.0);
+            workingHoursInput.value = totalHours.toFixed(2);
         }
+        // Recalculate OT when admin/admin edits are changing punches
+        calculateOvertimePoints();
+    }
+
+    // Calculate overtime according to rules:
+    // - OT window default: 17:30 - 20:00 (2.5 hours max real time)
+    // - Only compute when both OT check-in and check-out are present
+    // - OT points = actual_hours * 1.5 (capped at 2.5 hours)
+    // - Deductions: each <=30min late check-in or early check-out -> -0.5 per 30min block (ceil)
+    function calculateOvertimePoints() {
+        const otIn = overtimeCheckInInput.value;
+        const otOut = overtimeCheckOutInput.value;
+        if (!otIn || !otOut) {
+            overtimeDisplayInput.value = '';
+            overtimeHiddenInput.value = '';
+            overtimePointsDisplay.textContent = '';
+            return;
+        }
+
+        const inDt = new Date(otIn);
+        const outDt = new Date(otOut);
+        if (outDt <= inDt) {
+            overtimeDisplayInput.value = '';
+            overtimeHiddenInput.value = '';
+            overtimePointsDisplay.textContent = '';
+            return;
+        }
+
+        const msToHours = (outDt - inDt) / (1000 * 60 * 60);
+        let actualHours = msToHours;
+        
+        // Cap actual OT hours at 2.5 (OT window is 17:30-20:00)
+        actualHours = Math.min(actualHours, 2.5);
+        
+        let overtimePoints = actualHours * 1.5;
+
+        // OT window boundaries on the attendance date
+        const datePart = inDt.toISOString().split('T')[0];
+        const otStart = new Date(datePart + 'T17:30:00');
+        const otEnd = new Date(datePart + 'T20:00:00');
+
+        let totalDeduction = 0;
+
+        // Late check-in after 17:30
+        if (inDt > otStart) {
+            const lateMinutes = (inDt - otStart) / (1000 * 60);
+            totalDeduction += Math.ceil(lateMinutes / 30) * 0.5;
+        }
+
+        // Early check-out before 20:00
+        if (outDt < otEnd) {
+            const earlyMinutes = (otEnd - outDt) / (1000 * 60);
+            totalDeduction += Math.ceil(earlyMinutes / 30) * 0.5;
+        }
+
+        const finalPoints = Math.max(0, overtimePoints - totalDeduction);
+
+        // Set display (hours) and hidden submitted OT points
+        overtimeDisplayInput.value = actualHours.toFixed(2);
+        overtimeHiddenInput.value = finalPoints.toFixed(2);
+        overtimePointsDisplay.textContent = finalPoints.toFixed(2);
     }
     
     checkInInput.addEventListener('change', function() {
@@ -147,6 +271,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     checkOutInput.addEventListener('change', calculateWorkingHours);
+    checkInInput2.addEventListener('change', calculateWorkingHours);
+    checkOutInput2.addEventListener('change', calculateWorkingHours);
+    overtimeCheckInInput.addEventListener('change', calculateOvertimePoints);
+    overtimeCheckOutInput.addEventListener('change', calculateOvertimePoints);
+
+    // Initialize calculated values on load (populate hours and points if punches exist)
+    calculateWorkingHours();
+    calculateOvertimePoints();
     
     // Set default time for datetime-local inputs based on date
     dateInput.addEventListener('change', function() {
@@ -154,7 +286,13 @@ document.addEventListener('DOMContentLoaded', function() {
             checkInInput.value = this.value + 'T08:00';
         }
         if (this.value && !checkOutInput.value) {
-            checkOutInput.value = this.value + 'T17:00';
+            checkOutInput.value = this.value + 'T12:00';
+        }
+        if (this.value && !checkInInput2.value) {
+            checkInInput2.value = this.value + 'T13:00';
+        }
+        if (this.value && !checkOutInput2.value) {
+            checkOutInput2.value = this.value + 'T17:00';
         }
     });
 });

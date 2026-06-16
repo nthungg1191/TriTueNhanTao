@@ -33,7 +33,7 @@
     }
     .stat-card-title {
         font-size: 14px;
-        color: #7f8c8d;
+        color: #64748b;
         font-weight: 500;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -45,7 +45,7 @@
     .stat-card-value {
         font-size: 36px;
         font-weight: 700;
-        color: #2c3e50;
+        color: #1f2937;
         margin-bottom: 8px;
     }
     .stat-card-change {
@@ -69,7 +69,7 @@
     }
     .chart-card h3 {
         margin: 0 0 20px 0;
-        color: #2c3e50;
+        color: #1f2937;
         font-size: 20px;
     }
     .alerts-card {
@@ -80,32 +80,40 @@
     }
     .alerts-card h3 {
         margin: 0 0 20px 0;
-        color: #2c3e50;
+        color: #1f2937;
         font-size: 20px;
     }
     .alert-item {
         padding: 12px;
-        border-left: 4px solid #e74c3c;
-        background: #fff5f5;
+        border-left: 4px solid #b91c1c;
+        background: #fff1f2;
         border-radius: 6px;
         margin-bottom: 12px;
     }
+    .alert-item.danger {
+        border-left-color: #b91c1c;
+        background: #fff1f2;
+    }
     .alert-item.warning {
-        border-left-color: #f39c12;
-        background: #fffbf0;
+        border-left-color: #d97706;
+        background: #fff7ed;
     }
     .alert-item.info {
-        border-left-color: #3498db;
-        background: #f0f8ff;
+        border-left-color: #14b8a6;
+        background: #ecfeff;
+    }
+    .alert-item.success {
+        border-left-color: #0f766e;
+        background: #ecfdf5;
     }
     .alert-item-title {
         font-weight: 600;
-        color: #2c3e50;
+        color: #1f2937;
         margin-bottom: 4px;
     }
     .alert-item-desc {
         font-size: 13px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     .employee-list {
         list-style: none;
@@ -124,11 +132,11 @@
     }
     .employee-name {
         font-weight: 500;
-        color: #2c3e50;
+        color: #1f2937;
     }
     .employee-time {
         font-size: 13px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     @media (max-width: 1024px) {
         .dashboard-grid {
@@ -140,7 +148,7 @@
 
 {% block content %}
 <div class="dashboard">
-    <h1 style="margin-bottom: 24px; color: #2c3e50;">📊 Dashboard</h1>
+    <h1 style="margin-bottom: 24px; color: #1f2937;">📊 Dashboard</h1>
     
     <!-- Statistics Cards -->
     <div class="stats-grid">
@@ -188,11 +196,16 @@
         
         <div class="stat-card">
             <div class="stat-card-header">
-                <div class="stat-card-title">Tổng giờ làm</div>
+                <div class="stat-card-title">Tổng công</div>
                 <div class="stat-card-icon">⏱️</div>
             </div>
-            <div class="stat-card-value">{{ today_report.total_working_hours }}</div>
-            <div class="stat-card-change">Giờ hôm nay</div>
+            <div class="stat-card-value">
+                {% set base_hours = today_report.total_working_hours or 0 %}
+                {% set ot_hours = today_report.total_overtime_hours if today_report.total_overtime_hours is not none else (today_report.total_overtime_actual_hours or 0) %}
+                {% set total_hours = base_hours + ot_hours %}
+                {{ "%.2f"|format(total_hours) }} công
+            </div>
+            <div class="stat-card-change">Hôm nay</div>
         </div>
         
         <div class="stat-card">
@@ -281,7 +294,7 @@
         }
         
         if (!weeklyData || weeklyData.length === 0) {
-            weeklyCtx.parentElement.innerHTML = '<p style="text-align: center; color: #7f8c8d; padding: 40px;">Chưa có dữ liệu tuần này</p>';
+            weeklyCtx.parentElement.innerHTML = '<p style="text-align: center; color: #64748b; padding: 40px;">Chưa có dữ liệu tuần này</p>';
             return;
         }
         

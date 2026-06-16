@@ -27,14 +27,26 @@ class ReportsService:
         late_count = sum(1 for a in attendances if a.status == 'late')
         absent_count = total_employees - len(attendances)
         early_leave_count = sum(1 for a in attendances if a.status == 'early_leave')
+        missing_check_in_count = sum(1 for a in attendances if a.status == 'missing_check_in')
+        missing_check_out_count = sum(1 for a in attendances if a.status == 'missing_check_out')
         
         # Tính tỷ lệ
         attendance_rate = (len(attendances) / total_employees * 100) if total_employees > 0 else 0
         on_time_rate = (present_count / total_employees * 100) if total_employees > 0 else 0
         
-        # Tổng giờ làm việc
+        # Tổng giờ làm việc (hành chính) and overtime
         total_working_hours = sum(a.working_hours for a in attendances if a.working_hours)
+        # total_overtime_hours here represents OT points (converted), keep for backward compatibility
         total_overtime_hours = sum(a.overtime_hours for a in attendances if a.overtime_hours)
+        # also compute total raw OT hours (actual hours spent in OT)
+        total_overtime_actual_hours = 0.0
+        for a in attendances:
+            try:
+                if a.overtime_check_in_time and a.overtime_check_out_time:
+                    delta = a.overtime_check_out_time - a.overtime_check_in_time
+                    total_overtime_actual_hours += max(delta.total_seconds(), 0) / 3600
+            except Exception:
+                pass
         
         return {
             'date': report_date.isoformat(),
@@ -44,10 +56,13 @@ class ReportsService:
             'late': late_count,
             'absent': absent_count,
             'early_leave': early_leave_count,
+            'missing_check_in': missing_check_in_count,
+            'missing_check_out': missing_check_out_count,
             'attendance_rate': round(attendance_rate, 2),
             'on_time_rate': round(on_time_rate, 2),
             'total_working_hours': round(total_working_hours, 2),
             'total_overtime_hours': round(total_overtime_hours, 2),
+            'total_overtime_actual_hours': round(total_overtime_actual_hours, 2),
             'attendances': [a.to_dict() for a in attendances]
         }
     
@@ -94,6 +109,8 @@ class ReportsService:
                 'late': sum(1 for a in day_attendances if a.status == 'late'),
                 'absent': total_employees - len(day_attendances),
                 'early_leave': sum(1 for a in day_attendances if a.status == 'early_leave'),
+                'missing_check_in': sum(1 for a in day_attendances if a.status == 'missing_check_in'),
+                'missing_check_out': sum(1 for a in day_attendances if a.status == 'missing_check_out'),
                 'total': len(day_attendances),
                 'working_hours': round(sum(a.working_hours for a in day_attendances if a.working_hours), 2)
             }
@@ -102,6 +119,8 @@ class ReportsService:
         week_total_present = sum(s['present'] for s in daily_stats.values())
         week_total_late = sum(s['late'] for s in daily_stats.values())
         week_total_absent = sum(s['absent'] for s in daily_stats.values())
+        week_total_missing_check_in = sum(s.get('missing_check_in', 0) for s in daily_stats.values())
+        week_total_missing_check_out = sum(s.get('missing_check_out', 0) for s in daily_stats.values())
         week_total_hours = sum(s['working_hours'] for s in daily_stats.values())
         
         return {
@@ -111,6 +130,8 @@ class ReportsService:
             'week_total_present': week_total_present,
             'week_total_late': week_total_late,
             'week_total_absent': week_total_absent,
+            'week_total_missing_check_in': week_total_missing_check_in,
+            'week_total_missing_check_out': week_total_missing_check_out,
             'week_total_hours': round(week_total_hours, 2),
             'average_attendance_rate': round((week_total_present / (total_employees * 7) * 100) if total_employees > 0 else 0, 2),
             'daily_stats': list(daily_stats.values())
@@ -144,6 +165,8 @@ class ReportsService:
         total_present = sum(1 for a in attendances if a.status == 'present')
         total_late = sum(1 for a in attendances if a.status == 'late')
         total_early_leave = sum(1 for a in attendances if a.status == 'early_leave')
+        total_missing_check_in = sum(1 for a in attendances if a.status == 'missing_check_in')
+        total_missing_check_out = sum(1 for a in attendances if a.status == 'missing_check_out')
         total_working_hours = sum(a.working_hours for a in attendances if a.working_hours)
         total_overtime_hours = sum(a.overtime_hours for a in attendances if a.overtime_hours)
         
@@ -186,6 +209,8 @@ class ReportsService:
             'total_late': total_late,
             'total_absent': total_absent,
             'total_early_leave': total_early_leave,
+            'total_missing_check_in': total_missing_check_in,
+            'total_missing_check_out': total_missing_check_out,
             'total_working_hours': round(total_working_hours, 2),
             'total_overtime_hours': round(total_overtime_hours, 2),
             'average_attendance_rate': round((actual_attendance / expected_attendance * 100) if expected_attendance > 0 else 0, 2),
@@ -245,6 +270,8 @@ class ReportsService:
         present_days = sum(1 for a in attendances if a.status in ['present', 'late'])
         absent_days = total_days - len(attendances)
         late_days = sum(1 for a in attendances if a.status == 'late')
+        missing_check_in_days = sum(1 for a in attendances if a.status == 'missing_check_in')
+        missing_check_out_days = sum(1 for a in attendances if a.status == 'missing_check_out')
         total_working_hours = sum(a.working_hours for a in attendances if a.working_hours)
         
         return {
@@ -255,6 +282,8 @@ class ReportsService:
             'present_days': present_days,
             'absent_days': absent_days,
             'late_days': late_days,
+            'missing_check_in_days': missing_check_in_days,
+            'missing_check_out_days': missing_check_out_days,
             'attendance_rate': round((present_days / total_days * 100) if total_days > 0 else 0, 2),
             'total_working_hours': round(total_working_hours, 2),
             'average_hours_per_day': round(total_working_hours / present_days, 2) if present_days > 0 else 0

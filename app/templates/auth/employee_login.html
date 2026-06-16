@@ -1,0 +1,54 @@
+{% extends 'auth/login_base.html' %}
+
+{% block title %}Đăng Nhập Nhân Viên{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-left">
+        <div class="login-content">
+            <div class="logo">👥</div>
+            <h1 class="title">Nhân Viên - Chấm Công</h1>
+            <p class="subtitle">Đăng nhập để xem lịch, đăng ký tăng ca và xin nghỉ.</p>
+        </div>
+    </div>
+    <div class="login-right">
+        <div class="login-form-header">
+            <h2>Đăng Nhập Nhân Viên</h2>
+            <p>Nhập mã nhân viên và mật khẩu để truy cập trang nhân viên.</p>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('auth.employee_login') }}" autocomplete="off">
+            <input type="text" name="fakeusernameremembered" id="fakeusernameremembered" style="display:none;">
+            <input type="password" name="fakepasswordremembered" id="fakepasswordremembered" style="display:none;">
+            <div class="form-group">
+                <label class="form-label" for="username">Mã nhân viên</label>
+                <div class="form-input-group">
+                    <span class="form-icon">👤</span>
+                    <input type="text" class="form-input form-input-with-icon" id="username" name="username" autocomplete="off" placeholder="Nhập mã nhân viên" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Mật khẩu</label>
+                <div class="form-input-group">
+                    <span class="form-icon">🔒</span>
+                    <input type="password" class="form-input form-input-with-icon" id="password" name="password" autocomplete="new-password" placeholder="Nhập mật khẩu" required>
+                </div>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" class="checkbox" id="remember" name="remember">
+                <label class="checkbox-label" for="remember">Ghi nhớ đăng nhập</label>
+            </div>
+            <button type="submit" class="btn-login">Đăng Nhập →</button>
+        </form>
+        <a class="attendance-link" href="{{ url_for('kiosk.attendance_only') }}">Chấm công không cần đăng nhập</a>
+        <a class="attendance-link" href="{{ url_for('auth.login') }}">Quay lại trang đăng nhập quản trị</a>
+        <div class="attendance-note">Nếu bạn là quản trị viên, vui lòng dùng Trang quản trị.</div>
+    </div>
+</div>
+{% endblock %}

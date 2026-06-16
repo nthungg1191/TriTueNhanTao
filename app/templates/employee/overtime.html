@@ -1,0 +1,155 @@
+{% extends 'layouts/employee_base.html' %}
+
+{% block title %}Đăng ký tăng ca và làm Chủ nhật{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Đăng ký tăng ca / làm Chủ nhật</h1>
+    <small>Chọn loại yêu cầu và gửi cho quản lý</small>
+</div>
+
+<div class="form-card">
+    <form method="post" id="ot-form">
+        <div class="form-group">
+            <label>Loại yêu cầu</label>
+            <div class="radio-group">
+                <label class="radio-option">
+                    <input type="radio" name="request_type" value="overtime" checked onchange="updateRequestType()" />
+                    <span>Tăng ca 17:30 - 20:00</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="request_type" value="sunday" onchange="updateRequestType()" />
+                    <span>Làm Chủ nhật</span>
+                </label>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Ngày</label>
+            <input type="date" id="date-input" name="date" required class="form-control" />
+            <div id="date-error" style="color: #b91c1c; margin-top:6px; display:none;"></div>
+        </div>
+        <input type="hidden" name="hours" id="hours" value="2.5" />
+        <div id="request-note" class="info-box">
+            Yêu cầu tăng ca cố định 2.5 giờ (17:30-20:00). Nếu bạn muốn đăng ký làm Chủ nhật, chọn "Làm Chủ nhật".
+        </div>
+        <div class="form-group">
+            <label>Lý do</label>
+            <textarea name="reason" rows="3" class="form-control"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Gửi yêu cầu</button>
+    </form>
+</div>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr><th>Ngày</th><th>Loại</th><th>Giờ</th><th>Trạng thái</th><th>Lý do</th><th>Hành động</th></tr>
+        </thead>
+        <tbody>
+        {% for r in requests %}
+            <tr>
+                <td>{{ r.date }}</td>
+                <td>{{ r.kind_label if r.kind_label else 'Tăng ca' }}</td>
+                <td>{{ r.hours }}h</td>
+                <td><span class="request-status {{ r.status_badge_class }}">{{ r.status_label }}</span></td>
+                <td>{{ r.reason }}</td>
+                <td>
+                    {% if r.status == 'pending' and not r.is_overdue %}
+                    <form method="post" action="{{ url_for('employee.withdraw_overtime', request_id=r.id) }}" style="display:inline;">
+                        <button type="button" class="btn btn-secondary" data-confirm-message="Bạn có chắc muốn thu hồi yêu cầu tăng ca ngày {{ r.date }}?" onclick="openConfirmModal(this)">Thu hồi</button>
+                    </form>
+                    {% else %}
+                    <span style="color:#94a3b8;">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="6">Chưa có yêu cầu nào.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function updateRequestType() {
+    const requestType = document.querySelector('input[name="request_type"]:checked').value;
+    const note = document.getElementById('request-note');
+    const hoursInput = document.getElementById('hours');
+
+    if (requestType === 'sunday') {
+        note.innerText = 'Đăng ký làm Chủ nhật mặc định 8 giờ. Vui lòng chọn ngày Chủ nhật.';
+        hoursInput.value = '8.0';
+    } else {
+        note.innerText = 'Tăng ca cố định 2.5 giờ (17:30 - 20:00). Vui lòng chọn ngày trong tuần (không phải Chủ nhật).';
+        hoursInput.value = '2.5';
+    }
+}
+updateRequestType();
+const overtimeDateInput = document.getElementById('date-input');
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+overtimeDateInput.min = tomorrow.toISOString().split('T')[0];
+// Client-side validation: ensure Sunday requests use Sunday date and OT requests are not on Sunday
+document.getElementById('ot-form').addEventListener('submit', function(e) {
+    const requestType = document.querySelector('input[name="request_type"]:checked').value;
+    const dateInput = document.querySelector('input[name="date"]').value;
+    if (!dateInput) return; // required input will handle
+    const d = new Date(dateInput + 'T00:00:00');
+    const day = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+    if (requestType === 'sunday' && day !== 0) {
+        e.preventDefault();
+        alert('Vui lòng chọn ngày Chủ nhật khi chọn "Làm Chủ nhật".');
+        return false;
+    }
+
+    const selectedDate = new Date(dateInput + 'T00:00:00');
+    const minDate = new Date(overtimeDateInput.min + 'T00:00:00');
+    if (selectedDate < minDate) {
+        e.preventDefault();
+        alert('Yêu cầu này phải được đăng ký trước ít nhất 1 ngày.');
+        return false;
+    }
+
+    if (requestType === 'overtime' && day === 0) {
+        e.preventDefault();
+        alert('Vui lòng không chọn Chủ nhật cho loại "Tăng ca 17:30 - 20:00"; dùng "Làm Chủ nhật" thay thế.');
+        return false;
+    }
+});
+
+// Instant validation when date changes
+document.getElementById('date-input').addEventListener('change', function(e) {
+    const dateVal = this.value;
+    const errorEl = document.getElementById('date-error');
+    errorEl.style.display = 'none';
+    errorEl.innerText = '';
+    if (!dateVal) return;
+    const d = new Date(dateVal + 'T00:00:00');
+    const day = d.getDay();
+    const requestType = document.querySelector('input[name="request_type"]:checked').value;
+
+    if (requestType === 'overtime' && day === 0) {
+        this.value = '';
+        errorEl.style.display = 'block';
+        errorEl.innerText = 'Không được chọn Chủ nhật cho "Tăng ca 17:30 - 20:00". Chọn "Làm Chủ nhật" nếu muốn làm Chủ nhật.';
+        return;
+    }
+
+    if (requestType === 'sunday' && day !== 0) {
+        this.value = '';
+        errorEl.style.display = 'block';
+        errorEl.innerText = 'Khi chọn "Làm Chủ nhật", vui lòng chọn ngày Chủ nhật.';
+        return;
+    }
+
+    if (new Date(dateVal + 'T00:00:00') < new Date(overtimeDateInput.min + 'T00:00:00')) {
+        this.value = '';
+        errorEl.style.display = 'block';
+        errorEl.innerText = 'Yêu cầu này phải được đăng ký trước ít nhất 1 ngày.';
+        return;
+    }
+});
+</script>
+
+{% endblock %}

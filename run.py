@@ -1,5 +1,28 @@
 
 import os
+import socket
+import sys
+import threading
+import webbrowser
+
+
+def _restart_inside_local_venv():
+    """Use the bundled virtualenv when run.py is launched directly."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    venv_python = os.path.join(script_dir, '.venv', 'Scripts', 'python.exe')
+
+    if not os.path.exists(venv_python):
+        return
+
+    current_python = os.path.normcase(os.path.abspath(sys.executable))
+    target_python = os.path.normcase(os.path.abspath(venv_python))
+
+    if current_python != target_python:
+        os.execv(venv_python, [venv_python, *sys.argv])
+
+
+_restart_inside_local_venv()
+
 from flask import redirect, url_for
 from app import create_app, db
 from app.models import User, Employee, Attendance, SystemLog
@@ -9,9 +32,25 @@ config_name = os.getenv('FLASK_ENV', 'development')
 app = create_app(config_name)
 
 
+def open_start_page(port):
+    """Open the login page after the server starts."""
+    webbrowser.open_new(f'http://127.0.0.1:{port}/auth/login')
+
+
+def is_port_free(port):
+    """Check whether a TCP port is available for binding."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(('0.0.0.0', port))
+            return True
+        except OSError:
+            return False
+
+
 @app.route('/')
 def index():
-    """Redirect to kiosk page"""
+    """Redirect to the admin login page when the app starts."""
     return redirect(url_for('auth.login'))
 
 @app.shell_context_processor
@@ -95,14 +134,57 @@ def seed_db():
         }
     ]
     
+    # Create Employee and User records for sample employees
+    for emp in sample_employees:
+        existing_emp = Employee.query.filter_by(employee_code=emp['employee_code']).first()
+        if not existing_emp:
+            new_emp = Employee(
+                employee_code=emp['employee_code'],
+                name=emp['name'],
+                email=emp.get('email'),
+                phone=emp.get('phone'),
+                department=emp.get('department'),
+                position=emp.get('position'),
+                hire_date=emp.get('hire_date'),
+                is_active=True
+            )
+            db.session.add(new_emp)
+
+            # Create a corresponding User account (username = employee_code)
+            existing_user = User.query.filter_by(username=emp['employee_code']).first()
+            if not existing_user:
+                u = User(
+                    username=emp['employee_code'],
+                    email=emp.get('email') or f"{emp['employee_code'].lower()}@example.com",
+                    role='employee',
+                    is_active=True
+                )
+                # default password: employee_code lowercased
+                u.set_password(emp['employee_code'].lower())
+                db.session.add(u)
+
     db.session.commit()
     print('🎉 Database seeded successfully!')
 
 
-if __name__ == '__main__':
+def start_server(port, debug_mode=False):
+    print(f'Starting server on port {port}...')
+    threading.Timer(1.0, lambda: open_start_page(port)).start()
     app.run(
         host='0.0.0.0',
-        port=5555,
-        debug=True
+        port=port,
+        debug=debug_mode
     )
+
+
+if __name__ == '__main__':
+    debug_mode = os.getenv('FLASK_DEBUG', '0') == '1'
+    port = int(os.getenv('PORT', '5555'))
+    selected_port = port
+
+    while not is_port_free(selected_port):
+        print(f'Port {selected_port} is busy, trying {selected_port + 1} instead.')
+        selected_port += 1
+
+    start_server(selected_port, debug_mode=debug_mode)
 

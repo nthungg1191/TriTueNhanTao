@@ -17,7 +17,7 @@
     }
     .page-header h1 {
         font-size: 28px;
-        color: #2c3e50;
+        color: #1f2937;
         margin: 0;
     }
     .page-actions {
@@ -43,13 +43,13 @@
     }
     .filter-group label {
         font-size: 13px;
-        color: #5a6c7d;
+        color: #64748b;
         font-weight: 500;
     }
     .filter-select,
     .filter-input {
         padding: 10px 14px;
-        border: 2px solid #e0e0e0;
+        border: 2px solid #d7e3ea;
         border-radius: 8px;
         font-size: 14px;
         background: white;
@@ -63,8 +63,8 @@
     .filter-select:focus,
     .filter-input:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        border-color: #14b8a6;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
     }
     .stats-bar {
         display: flex;
@@ -78,10 +78,10 @@
         border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         font-size: 14px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     .stat-badge strong {
-        color: #2c3e50;
+        color: #1f2937;
         margin-left: 8px;
     }
     .table-view {
@@ -98,7 +98,7 @@
         border-collapse: collapse;
     }
     .table thead {
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: linear-gradient(135deg, #14b8a6, #0f766e);
         color: white;
     }
     .table th {
@@ -117,7 +117,7 @@
         transition: all 0.2s;
     }
     .table tbody tr:hover {
-        background: #f8f9fa;
+        background: #eefbf9;
     }
     .status-badge {
         display: inline-block;
@@ -128,20 +128,58 @@
         text-transform: uppercase;
     }
     .status-present {
-        background: #e8f5e9;
-        color: #4caf50;
+        background: #ecfdf5;
+        color: #166534;
     }
     .status-late {
-        background: #fff3e0;
-        color: #ff9800;
+        background: #fff7ed;
+        color: #c2410c;
     }
     .status-absent {
-        background: #ffebee;
-        color: #f44336;
+        background: #fff1f2;
+        color: #b91c1c;
     }
     .status-early_leave {
-        background: #e3f2fd;
-        color: #2196f3;
+        background: #ecfeff;
+        color: #0e7490;
+    }
+    .shift-badges {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .shift-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #eef2f7;
+        color: #64748b;
+        width: fit-content;
+    }
+    .shift-badge span {
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .shift-badge.on_time {
+        background: #ecfdf5;
+        color: #166534;
+    }
+    .shift-badge.late {
+        background: #fff7ed;
+        color: #c2410c;
+    }
+    .shift-badge.early {
+        background: #ecfeff;
+        color: #0e7490;
+    }
+    .shift-badge.missing {
+        background: #fff1f2;
+        color: #b91c1c;
     }
     .btn-group {
         display: flex;
@@ -155,7 +193,7 @@
     .empty-state {
         text-align: center;
         padding: 60px 20px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     .empty-state-icon {
         font-size: 64px;
@@ -163,12 +201,12 @@
     }
     .empty-state h3 {
         margin: 0 0 8px 0;
-        color: #2c3e50;
+        color: #1f2937;
     }
     .time-display {
         font-family: 'Courier New', monospace;
         font-size: 13px;
-        color: #5a6c7d;
+        color: #64748b;
     }
     .photo-cell {
         display: flex;
@@ -181,25 +219,25 @@
         height: 60px;
         object-fit: cover;
         border-radius: 6px;
-        border: 2px solid #e0e0e0;
+        border: 2px solid #d7e3ea;
         cursor: pointer;
         transition: all 0.2s;
     }
     .photo-thumbnail:hover {
-        border-color: #667eea;
+        border-color: #14b8a6;
         transform: scale(1.05);
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        box-shadow: 0 2px 8px rgba(20, 184, 166, 0.25);
     }
     .photo-placeholder {
         width: 60px;
         height: 60px;
-        background: #f5f5f5;
-        border: 2px dashed #ddd;
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
         border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #999;
+        color: #94a3b8;
         font-size: 11px;
         text-align: center;
     }
@@ -242,7 +280,7 @@
         transition: color 0.2s;
     }
     .photo-modal-close:hover {
-        color: #ff6b6b;
+        color: #fb7185;
     }
     .photo-info {
         position: absolute;
@@ -310,24 +348,16 @@
 
     <form method="GET" action="{{ url_for('admin.attendance') }}" class="filters-bar">
         <div class="filter-group">
-            <label for="date">Ngày</label>
-            <input type="date" 
-                   name="date" 
-                   id="date" 
-                   class="filter-input"
-                   value="{{ request.args.get('date', today.strftime('%Y-%m-%d')) }}">
+                 <label for="date">Ngày</label>
+                 <input type="text" 
+                     name="date" 
+                     id="date" 
+                     class="filter-input date-picker"
+                     placeholder="dd/mm/yyyy"
+                     value="{{ request.args.get('date', today.strftime('%d/%m/%Y')) }}">
         </div>
         
-        <div class="filter-group">
-            <label for="status">Trạng thái</label>
-            <select name="status" id="status" class="filter-select">
-                <option value="">Tất cả</option>
-                <option value="present" {% if request.args.get('status') == 'present' %}selected{% endif %}>Có mặt</option>
-                <option value="late" {% if request.args.get('status') == 'late' %}selected{% endif %}>Đi muộn</option>
-                <option value="absent" {% if request.args.get('status') == 'absent' %}selected{% endif %}>Vắng mặt</option>
-                <option value="early_leave" {% if request.args.get('status') == 'early_leave' %}selected{% endif %}>Về sớm</option>
-            </select>
-        </div>
+        <!-- Trạng thái filter removed as requested -->
         
         <div class="filter-group">
             <label for="employee_id">Nhân viên</label>
@@ -352,20 +382,7 @@
         </div>
     </form>
 
-    <div class="stats-bar">
-        <div class="stat-badge">
-            Tổng số: <strong>{{ records|length }}</strong>
-        </div>
-        <div class="stat-badge">
-            Có mặt: <strong>{{ records|selectattr('status', 'equalto', 'present')|list|length }}</strong>
-        </div>
-        <div class="stat-badge">
-            Đi muộn: <strong>{{ records|selectattr('status', 'equalto', 'late')|list|length }}</strong>
-        </div>
-        <div class="stat-badge">
-            Vắng mặt: <strong>{{ records|selectattr('status', 'equalto', 'absent')|list|length }}</strong>
-        </div>
-    </div>
+    <!-- stats-bar removed as requested -->
 
     <div class="table-view">
         <div class="table-container">
@@ -378,7 +395,9 @@
                         <th>Ngày</th>
                         <th>Check-in</th>
                         <th>Check-out</th>
-                        <th>Giờ làm</th>
+                        <th>OT</th>
+                        <th>OT (công)</th>
+                        <th>Tổng công</th>
                         <th>Trạng thái</th>
                         <th>Thao tác</th>
                     </tr>
@@ -398,6 +417,11 @@
                                         <span style="color: #ccc;">--:--:--</span>
                                     {% endif %}
                                 </div>
+                                {% if record.check_in_time_2 %}
+                                    <div class="time-display" style="margin-top: 6px;">
+                                        {{ record.check_in_time_2.strftime('%H:%M:%S') }}
+                                    </div>
+                                {% endif %}
                                 {% if record.check_in_photo %}
                                     <img src="{{ record.check_in_photo }}" 
                                          alt="Check-in photo" 
@@ -419,6 +443,11 @@
                                         <span style="color: #ccc;">--:--:--</span>
                                     {% endif %}
                                 </div>
+                                {% if record.check_out_time_2 %}
+                                    <div class="time-display" style="margin-top: 6px;">
+                                        {{ record.check_out_time_2.strftime('%H:%M:%S') }}
+                                    </div>
+                                {% endif %}
                                 {% if record.check_out_photo %}
                                     <img src="{{ record.check_out_photo }}" 
                                          alt="Check-out photo" 
@@ -432,32 +461,57 @@
                             </div>
                         </td>
                         <td>
-                            {% if record.working_hours %}
-                                {{ "%.1f"|format(record.working_hours) }}h
-                            {% else %}
-                                <span style="color: #ccc;">--</span>
-                            {% endif %}
+                            <div class="time-display">
+                                {% if record.overtime_check_in_time %}
+                                    {{ record.overtime_check_in_time.strftime('%H:%M:%S') }}
+                                {% else %}
+                                    <span style="color: #ccc;">--:--:--</span>
+                                {% endif %}
+                            </div>
+                            <div class="time-display" style="margin-top:6px;">
+                                {% if record.overtime_check_out_time %}
+                                    {{ record.overtime_check_out_time.strftime('%H:%M:%S') }}
+                                {% endif %}
+                            </div>
                         </td>
                         <td>
-                            <span class="status-badge status-{{ record.status }}">
-                                {% if record.status == 'present' %}Có mặt
-                                {% elif record.status == 'late' %}Đi muộn
-                                {% elif record.status == 'absent' %}Vắng mặt
-                                {% elif record.status == 'early_leave' %}Về sớm
-                                {% else %}{{ record.status }}
-                                {% endif %}
-                            </span>
+                            {{ ('%.2f'|format(record.overtime_hours)) if record.overtime_hours else '0.00' }}
+                        </td>
+                        <td>
+                            {{ ('%.2f'|format((record.working_hours or 0) + (record.overtime_hours or 0))) }}
+                        </td>
+                        <td>
+                            {% set shift_breakdown = record.get_shift_breakdown() if record.get_shift_breakdown is defined else record.shift_breakdown %}
+                            {% set shift_labels = record.get_shift_breakdown_labels() if record.get_shift_breakdown_labels is defined else record.shift_breakdown_labels if record.shift_breakdown_labels is defined else {} %}
+                            <div class="shift-badges">
+                                <div class="shift-badge {% if shift_breakdown.morning == 'on_time' %}on_time{% elif shift_breakdown.morning == 'late' %}late{% elif shift_breakdown.morning == 'missing' %}missing{% endif %}">
+                                    Sáng: <span>{{ shift_labels.morning if shift_labels.morning is defined else shift_labels.get('morning', '--') }}</span>
+                                </div>
+                                <div class="shift-badge {% if shift_breakdown.lunch == 'on_time' %}on_time{% elif shift_breakdown.lunch == 'early' %}early{% elif shift_breakdown.lunch == 'missing' %}missing{% endif %}">
+                                    Nghỉ trưa: <span>{{ shift_labels.lunch if shift_labels.lunch is defined else shift_labels.get('lunch', '--') }}</span>
+                                </div>
+                                <div class="shift-badge {% if shift_breakdown.afternoon == 'on_time' %}on_time{% elif shift_breakdown.afternoon == 'late' %}late{% elif shift_breakdown.afternoon == 'missing' %}missing{% endif %}">
+                                    Chiều: <span>{{ shift_labels.afternoon if shift_labels.afternoon is defined else shift_labels.get('afternoon', '--') }}</span>
+                                </div>
+                                <div class="shift-badge {% if shift_breakdown.final == 'on_time' %}on_time{% elif shift_breakdown.final == 'early' %}early{% elif shift_breakdown.final == 'missing' %}missing{% endif %}">
+                                    Tan ca: <span>{{ shift_labels.final if shift_labels.final is defined else shift_labels.get('final', '--') }}</span>
+                                </div>
+                            </div>
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a href="{{ url_for('admin.attendance_edit', attendance_id=record.id) }}" 
-                                   class="btn btn-sm btn-secondary">✏️ Sửa</a>
-                                <form method="POST" 
-                                      action="{{ url_for('admin.attendance_delete', attendance_id=record.id) }}" 
-                                      style="display: inline;"
-                                      onsubmit="return confirm('Bạn có chắc muốn xóa bản ghi chấm công này?');">
-                                    <button type="submit" class="btn btn-sm btn-danger">🗑️ Xóa</button>
-                                </form>
+                                {% if record.id %}
+                                    <a href="{{ url_for('admin.attendance_edit', attendance_id=record.id) }}" 
+                                       class="btn btn-sm btn-secondary">✏️ Sửa</a>
+                                    <form method="POST" 
+                                          action="{{ url_for('admin.attendance_delete', attendance_id=record.id) }}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('Bạn có chắc muốn xóa bản ghi chấm công này?');">
+                                        <button type="submit" class="btn btn-sm btn-danger">🗑️ Xóa</button>
+                                    </form>
+                                {% else %}
+                                    <span style="color: #999; font-size: 12px;">Chưa chấm công</span>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

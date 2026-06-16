@@ -1,17 +1,34 @@
 import numpy as np
 import json
 import logging
+import time
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from app.models.employee import Employee
 from app.models.face_embedding import FaceEmbedding
 from app.models.user import User
-from app.services.face_detection import FaceDetector
 import pickle
 import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+FACE_RECOGNITION_EMBEDDING_CACHE_TTL = float(os.getenv('FACE_RECOGNITION_EMBEDDING_CACHE_TTL', 10.0))
+_FACE_EMBEDDING_CACHE = {
+    'timestamp': 0.0,
+    'encodings': [],
+    'employee_codes': []
+}
+
+
+def _invalidate_face_embedding_cache():
+    """
+    Invalidate the in-memory face embedding cache so next recognition refreshes from DB.
+    """
+    global _FACE_EMBEDDING_CACHE
+    _FACE_EMBEDDING_CACHE['encodings'] = []
+    _FACE_EMBEDDING_CACHE['employee_codes'] = []
+    _FACE_EMBEDDING_CACHE['timestamp'] = 0.0
 
 
 class FaceService:
@@ -25,7 +42,11 @@ class FaceService:
             db_session: Database session
         """
         self.db = db_session
-        self.face_detector = FaceDetector()
+        try:
+            from app.services.face_detection import FaceDetector
+            self.face_detector = FaceDetector()
+        except Exception:
+            self.face_detector = None
         logger.info("FaceService initialized")
     
     def register_employee_face(self, employee_code: str, face_encoding: np.ndarray, 
@@ -170,35 +191,20 @@ class FaceService:
             min_distance = min(distances)
             best_match_index = distances.index(min_distance)
             
-            # Check if match is within tolerance
-            # Use stricter threshold: require distance < tolerance AND confidence > 0.6
-            # This prevents false matches when only one face encoding exists
+            # Match is accepted when the distance is within tolerance.
             if min_distance < self.face_detector.tolerance:
                 confidence = 1.0 - min_distance
+                employee_code = known_employee_ids[best_match_index]
                 
-                # Additional check: confidence must be high enough (at least 60%)
-                # This ensures we only match when the face is actually similar
-                if confidence >= 0.6:
-                    employee_code = known_employee_ids[best_match_index]
-                    
-                    logger.info(f"Employee recognized: {employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
-                    
-                    return {
-                        'success': True,
-                        'message': 'Employee recognized',
-                        'employee_code': employee_code,
-                        'confidence': confidence,
-                        'distance': min_distance
-                    }
-                else:
-                    logger.warning(f"Match found but confidence too low: {confidence:.3f} < 0.6 (distance: {min_distance:.3f})")
-                    return {
-                        'success': False,
-                        'message': f'Face detected but confidence too low ({confidence:.1%}). Please register your face.',
-                        'employee_code': None,
-                        'confidence': confidence,
-                        'distance': min_distance
-                    }
+                logger.info(f"Employee recognized: {employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
+                
+                return {
+                    'success': True,
+                    'message': 'Employee recognized',
+                    'employee_code': employee_code,
+                    'confidence': confidence,
+                    'distance': min_distance
+                }
             else:
                 logger.info(f"No match found. Min distance: {min_distance:.3f} (tolerance: {self.face_detector.tolerance})")
                 return {
@@ -532,7 +538,13 @@ class FaceService:
             
             self.db.add(face_embedding)
             self.db.commit()
-            
+            logger.info(f"Face embedding added for employee {employee_code} (variant: {variant_type})")
+            # Invalidate in-memory cache so recognition sees new embedding immediately
+            try:
+                _invalidate_face_embedding_cache()
+            except Exception:
+                pass
+
             logger.info(f"Face embedding added for employee {employee_code} (variant: {variant_type})")
             
             return {
@@ -642,11 +654,25 @@ class FaceService:
         except Exception as e:
             logger.error(f"Error getting all face embeddings: {str(e)}")
             return [], []
-    
+
+    def _get_cached_face_embeddings(self) -> Tuple[List[np.ndarray], List[str]]:
+        """Return cached known embeddings or refresh them after TTL."""
+        global _FACE_EMBEDDING_CACHE
+        now = time.time()
+        if _FACE_EMBEDDING_CACHE['encodings'] and now - _FACE_EMBEDDING_CACHE['timestamp'] < FACE_RECOGNITION_EMBEDDING_CACHE_TTL:
+            return _FACE_EMBEDDING_CACHE['encodings'], _FACE_EMBEDDING_CACHE['employee_codes']
+
+        encodings, employee_codes = self.get_all_face_embeddings_multi()
+        _FACE_EMBEDDING_CACHE['encodings'] = encodings
+        _FACE_EMBEDDING_CACHE['employee_codes'] = employee_codes
+        _FACE_EMBEDDING_CACHE['timestamp'] = now
+        return encodings, employee_codes
+
     def recognize_employee_multi(self, face_encoding: np.ndarray, use_multi_embedding: bool = True) -> Dict[str, Any]:
         """
         Recognize employee using multi-embedding system
         Compares against all embeddings and returns best match
+        Falls back to legacy method if no multi-embeddings found
         
         Args:
             face_encoding: Face encoding to match
@@ -657,10 +683,15 @@ class FaceService:
         """
         try:
             if use_multi_embedding:
-                # Get all embeddings from multi-embedding table
-                known_encodings, known_employee_codes = self.get_all_face_embeddings_multi()
+                # Get cached embeddings and refresh only after TTL expires
+                known_encodings, known_employee_codes = self._get_cached_face_embeddings()
+                
+                # Fallback to legacy if no multi-embeddings found
+                if not known_encodings:
+                    logger.info("No multi-embeddings found, falling back to legacy method")
+                    known_encodings, known_employee_codes = self.get_all_face_encodings()
             else:
-                # Fallback to legacy method
+                # Use legacy method
                 known_encodings, known_employee_codes = self.get_all_face_encodings()
             
             if not known_encodings:
@@ -687,30 +718,19 @@ class FaceService:
             best_match_index = distances.index(min_distance)
             best_employee_code = known_employee_codes[best_match_index]
             
-            # Check if match is within tolerance
+            # Match is accepted when the distance is within tolerance.
             if min_distance < self.face_detector.tolerance:
                 confidence = 1.0 - min_distance
+                logger.info(f"Employee recognized: {best_employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
                 
-                if confidence >= 0.6:
-                    logger.info(f"Employee recognized: {best_employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
-                    
-                    return {
-                        'success': True,
-                        'message': 'Employee recognized',
-                        'employee_code': best_employee_code,
-                        'confidence': confidence,
-                        'distance': min_distance,
-                        'method': 'multi_embedding' if use_multi_embedding else 'legacy'
-                    }
-                else:
-                    logger.warning(f"Match found but confidence too low: {confidence:.3f} < 0.6")
-                    return {
-                        'success': False,
-                        'message': f'Face detected but confidence too low ({confidence:.1%}). Please register your face.',
-                        'employee_code': None,
-                        'confidence': confidence,
-                        'distance': min_distance
-                    }
+                return {
+                    'success': True,
+                    'message': 'Employee recognized',
+                    'employee_code': best_employee_code,
+                    'confidence': confidence,
+                    'distance': min_distance,
+                    'method': 'multi_embedding' if use_multi_embedding else 'legacy'
+                }
             else:
                 logger.info(f"No match found. Min distance: {min_distance:.3f}")
                 return {
@@ -753,7 +773,12 @@ class FaceService:
             employee_code = embedding.employee_code
             self.db.delete(embedding)
             self.db.commit()
-            
+            # Invalidate cache after deletion
+            try:
+                _invalidate_face_embedding_cache()
+            except Exception:
+                pass
+
             logger.info(f"Face embedding {embedding_id} deleted for employee {employee_code}")
             
             return {
@@ -785,7 +810,12 @@ class FaceService:
         try:
             count = self.db.query(FaceEmbedding).filter_by(employee_code=employee_code).delete()
             self.db.commit()
-            
+            # Invalidate cache after deleting all embeddings for employee
+            try:
+                _invalidate_face_embedding_cache()
+            except Exception:
+                pass
+
             logger.info(f"Deleted {count} embeddings for employee {employee_code}")
             
             return {
@@ -833,7 +863,12 @@ class FaceService:
             # Set this one as primary
             embedding.is_primary = True
             self.db.commit()
-            
+            # Invalidate cache after changing primary embedding
+            try:
+                _invalidate_face_embedding_cache()
+            except Exception:
+                pass
+
             logger.info(f"Set embedding {embedding_id} as primary for employee {embedding.employee_code}")
             
             return {

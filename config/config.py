@@ -22,7 +22,7 @@ class Config:
     # Database
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL',
-        'postgresql://postgres:Dm123123@localhost:5432/attendance_db'
+        'mysql+pymysql://root:@localhost:3306/attendance_dbx1'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
@@ -104,7 +104,7 @@ class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:Dm123123@localhost:5432/attendance_test_db'
+    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:your_password@localhost:5432/your_database_name'
     WTF_CSRF_ENABLED = False
 
 

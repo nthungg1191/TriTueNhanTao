@@ -1,7 +1,12 @@
 """Services package"""
 
-from app.services.face_detection import FaceDetector
-from app.services.face_service import FaceService
+try:
+    from app.services.face_detection import FaceDetector
+    from app.services.face_service import FaceService
+except Exception:
+    # Allow the package to import even if optional heavy deps are missing (e.g., face_recognition)
+    FaceDetector = None
+    FaceService = None
 
 __all__ = [
     'FaceDetector',

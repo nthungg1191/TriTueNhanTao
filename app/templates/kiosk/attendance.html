@@ -8,24 +8,26 @@
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%);
+            background: linear-gradient(135deg, rgba(18,36,51,0.55) 0%, rgba(22,94,86,0.55) 100%);
             min-height: 100vh; display:flex; align-items:center; justify-content:center; color:#fff;
         }
-        .wrap { width: 92%; max-width: 820px; background: rgba(255,255,255,0.12); border-radius: 20px; padding: 28px 24px; backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.22); box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+        .wrap { width: 92%; max-width: 820px; background: rgba(15,23,42,0.22); border-radius: 20px; padding: 28px 24px; backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 32px rgba(15,23,42,0.18); }
         h1 { font-size: 28px; font-weight: 700; letter-spacing: .3px; }
-        .sub { opacity:.9; margin-top: 4px; font-size: 14px; }
+        .sub { opacity:.85; margin-top: 4px; font-size: 14px; }
         .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; }
-        video, canvas { width: 420px; height: 315px; background:#000; border-radius: 12px; }
+        video, canvas { width: 320px; height: 240px; background:#020617; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); }
+        video { transform: scaleX(-1); }
         .side { flex:1; min-width: 220px; }
         .controls { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
-        .btn { padding:12px 20px; border-radius: 999px; border:2px solid #fff; color:#fff; background:transparent; cursor:pointer; transition: all .2s ease; font-weight:600; }
-        .btn:hover { background:#fff; color:#2193b0; transform: translateY(-1px); }
-        .btn-primary { background:#fff; color:#2193b0; }
-        .btn-primary:hover { background:transparent; color:#fff; }
+        .btn { display:inline-block; padding: 12px 20px; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.18s ease; border: 2px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; background: rgba(255,255,255,0.06); }
+        .btn:hover { background: rgba(255,255,255,0.09); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+        .btn-primary { background: rgba(255,255,255,0.06); color: white; border: 2px solid rgba(255,255,255,0.12); }
+        .btn-primary:hover { background: rgba(255,255,255,0.10); }
         .status { margin-top: 12px; font-size: 14px; min-height: 22px; }
         .tips { margin-top: 12px; font-size: 13px; opacity:.9; }
+        .auto-badge { display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:8px 12px; border-radius:999px; background: rgba(20,184,166,0.16); font-size: 13px; border:1px solid rgba(255,255,255,0.12); }
         .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; }
-        a.link { color:#fff; opacity:.9; text-decoration: none; border-bottom:1px dashed rgba(255,255,255,0.6); }
+        a.link { color:#ccfbf1; opacity:.95; text-decoration: none; border-bottom:1px dashed rgba(204,251,241,0.55); }
     </style>
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -38,12 +40,15 @@
             <div>
                 <h1>Kiosk Chấm Công</h1>
             </div>
-            
+            <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+                <div id="clock" style="font-size:14px; opacity:0.9;"></div>
+                <a href="{{ url_for('auth.logout') }}" class="link">Đăng xuất</a>
+            </div>
         </div>
         <div class="row">
             <div>
                 <video id="video" autoplay playsinline muted></video>
-                <canvas id="canvas" width="420" height="315" style="display:none"></canvas>
+                <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
             </div>
             <div class="side">
                 <div class="controls">
@@ -51,13 +56,15 @@
                     <button class="btn" id="btnStop">Tắt camera</button>
                 </div>
                 <div class="controls">
-                    <button class="btn btn-primary" id="btnIn">Check-in</button>
+                    <button class="btn" id="btnIn">Check-in</button>
                     <button class="btn" id="btnOut">Check-out</button>
                 </div>
+                <div class="auto-badge">🤖 Tự động nhận diện đang bật</div>
                 <div id="status" class="status"></div>
                 <div class="tips">
                     - Căn khuôn mặt vào trung tâm khung hình.<br/>
-                    - Tránh ngược sáng mạnh, giữ ổn định vài giây trước khi bấm.
+                    - Hệ thống sẽ tự nhận diện và chấm công cho đúng nhân viên.<br/>
+                    - Sau mỗi lượt thành công, hệ thống sẽ nghỉ ngắn trước khi quét tiếp.
                 </div>
             </div>
         </div>
@@ -65,6 +72,9 @@
 
 <script>
 let stream;
+let processing = false;
+let autoPauseUntil = 0;
+let autoTimer = null;
 const qs = (s) => document.querySelector(s);
 const video = qs('#video');
 const canvas = qs('#canvas');
@@ -72,9 +82,10 @@ const statusEl = qs('#status');
 
 async function startCamera() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false });
         video.srcObject = stream;
         statusEl.textContent = '📷 Camera đã bật.';
+        startAutoRecognition();
     } catch (e) {
         statusEl.textContent = '❌ Không truy cập được camera. Kiểm tra quyền trong trình duyệt.';
     }
@@ -91,12 +102,44 @@ function stopCamera() {
 
 function captureDataURL() {
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.9);
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+    return canvas.toDataURL('image/jpeg', 0.7);
 }
 
-async function recognizeThen(action) {
-    statusEl.textContent = '⏳ Đang nhận diện...';
+const AUTO_RECOGNITION_INTERVAL_MS = 900;
+const AUTO_RECOGNITION_SUCCESS_PAUSE_MS = 10000;
+
+function startAutoRecognition() {
+    if (autoTimer) return;
+
+    autoTimer = setInterval(() => {
+        if (!stream || processing || Date.now() < autoPauseUntil) return;
+        recognizeThen('auto', true);
+    }, AUTO_RECOGNITION_INTERVAL_MS);
+}
+
+function pauseAutoRecognition(ms = AUTO_RECOGNITION_SUCCESS_PAUSE_MS) {
+    autoPauseUntil = Date.now() + ms;
+}
+
+function updateClock() {
+    const clockEl = document.getElementById('clock');
+    const now = new Date();
+    const formatted = now.toLocaleTimeString('vi-VN', { hour12: false });
+    const formattedDate = now.toLocaleDateString('vi-VN');
+    clockEl.textContent = `${formattedDate} ${formatted}`;
+}
+
+async function recognizeThen(action, autoTriggered = false) {
+    if (!stream || processing) return;
+
+    processing = true;
+    if (!autoTriggered) {
+        statusEl.textContent = '⏳ Đang nhận diện...';
+    }
     try {
         const image = captureDataURL();
         const recRes = await fetch('/api/face/recognize', {
@@ -104,11 +147,14 @@ async function recognizeThen(action) {
         });
         const recData = await recRes.json();
         if (!recRes.ok || !recData.success || !recData.employee_code) {
-            statusEl.textContent = `❌ Không nhận diện được: ${recData.message || 'Unknown'}`;
+            if (!autoTriggered) {
+                statusEl.textContent = `❌ Không nhận diện được: ${recData.message || 'Unknown'}`;
+            }
             return;
         }
         const employee_code = recData.employee_code;
-        statusEl.textContent = '✅ Nhận diện thành công. Đang ghi chấm công...';
+        const employee_name = recData.employee_name || employee_code;
+        statusEl.textContent = `✅ Nhận diện: ${employee_name}. Đang ghi chấm công...`;
 
         // Send photo along with employee_code
         const attRes = await fetch(`/kiosk/${action}`, {
@@ -123,10 +169,13 @@ async function recognizeThen(action) {
         if (!attRes.ok) {
             statusEl.textContent = `❌ ${attData.message || 'Ghi chấm công thất bại'}`;
         } else {
-            statusEl.textContent = `✅ ${attData.message} (NV: ${employee_code})`;
+            statusEl.textContent = `✅ ${attData.message} (NV: ${employee_name})`;
+            pauseAutoRecognition(10000);
         }
     } catch (e) {
         statusEl.textContent = '❌ Lỗi kết nối đến máy chủ.';
+    } finally {
+        processing = false;
     }
 }
 
@@ -134,6 +183,20 @@ qs('#btnStart').addEventListener('click', startCamera);
 qs('#btnStop').addEventListener('click', stopCamera);
 qs('#btnIn').addEventListener('click', () => recognizeThen('check-in'));
 qs('#btnOut').addEventListener('click', () => recognizeThen('check-out'));
+
+window.addEventListener('load', () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    startCamera();
+});
+
+window.addEventListener('beforeunload', () => {
+    if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+    }
+    stopCamera();
+});
 </script>
 </body>
 </html>

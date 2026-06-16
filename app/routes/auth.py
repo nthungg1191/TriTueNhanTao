@@ -9,7 +9,7 @@ bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login page"""
+    """Admin login page only."""
     if current_user.is_authenticated:
         return redirect(url_for('admin.dashboard'))
     
@@ -24,6 +24,10 @@ def login():
             if not user.is_active:
                 flash('Tài khoản đã bị vô hiệu hóa.', 'danger')
                 return render_template('auth/login.html')
+
+            if getattr(user, 'role', None) != 'admin':
+                flash('Chỉ quản trị viên được đăng nhập. Nhân viên hãy dùng nút chấm công riêng.', 'info')
+                return render_template('auth/login.html')
             
             login_user(user, remember=remember)
             user.update_last_login()
@@ -37,13 +41,61 @@ def login():
             )
             
             next_page = request.args.get('next')
-            return redirect(next_page or url_for('admin.dashboard'))
+            if next_page:
+                return redirect(next_page)
+
+            return redirect(url_for('admin.dashboard'))
         else:
             if user:
                 user.increment_failed_login()
             flash('Tên đăng nhập hoặc mật khẩu không đúng.', 'danger')
     
     return render_template('auth/login.html')
+
+
+@bp.route('/employee-login', methods=['GET', 'POST'])
+def employee_login():
+    """Employee login page."""
+    if current_user.is_authenticated:
+        return redirect(url_for('employee.dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember', False)
+
+        user = User.query.filter_by(username=username).first()
+
+        if not user:
+            flash('Tài khoản không tồn tại.', 'warning')
+            return render_template('auth/employee_login.html')
+
+        if user.check_password(password):
+            if not user.is_active:
+                flash('Tài khoản đã bị vô hiệu hóa.', 'danger')
+                return render_template('auth/employee_login.html')
+
+            if getattr(user, 'role', None) != 'employee':
+                flash('Chỉ nhân viên mới được đăng nhập ở trang này.', 'info')
+                return render_template('auth/employee_login.html')
+
+            login_user(user, remember=remember)
+            user.update_last_login()
+
+            SystemLog.log_action(
+                user_id=user.id,
+                action='login',
+                ip_address=request.remote_addr,
+                user_agent=request.user_agent.string
+            )
+
+            return redirect(url_for('employee.dashboard'))
+        else:
+            # Incorrect password for existing user
+            user.increment_failed_login()
+            flash('Tên đăng nhập hoặc mật khẩu không đúng.', 'danger')
+
+    return render_template('auth/employee_login.html')
 
 
 @bp.route('/logout')

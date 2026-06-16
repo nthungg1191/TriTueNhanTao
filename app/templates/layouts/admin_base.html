@@ -5,19 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Attendance System</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <style>
         * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f6fa;
-            color: #2c3e50;
+            background: #f3f7fb;
+            color: #1f2937;
             display: flex;
             min-height: 100vh;
         }
         .sidebar {
             width: 240px;
-            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(180deg, rgba(18,36,51,0.55) 0%, rgba(22,94,86,0.55) 100%);
             color: #fff;
             padding: 24px 16px;
             position: fixed;
@@ -35,7 +36,7 @@
             margin-bottom: 8px;
             transition: background .2s ease, transform .2s ease;
         }
-        .nav a:hover { background: rgba(255,255,255,0.12); transform: translateX(4px); }
+        .nav a:hover { background: rgba(255,255,255,0.06); transform: none; }
         .content {
             flex: 1;
             margin-left: 240px;
@@ -64,7 +65,7 @@
                 top: 15px;
                 left: 15px;
                 z-index: 1001;
-                background: linear-gradient(135deg, #667eea, #764ba2);
+                background: linear-gradient(135deg, #14b8a6, #0f766e);
                 color: white;
                 border: none;
                 padding: 10px 15px;
@@ -106,12 +107,34 @@
                 <li><a href="/admin/employees" onclick="closeSidebar()">Nhân viên</a></li>
                 <li><a href="/admin/schedules" onclick="closeSidebar()">Lịch làm việc</a></li>
                 <li><a href="/admin/attendance" onclick="closeSidebar()">Chấm công</a></li>
+                <li><a href="/admin/requests" onclick="closeSidebar()">Yêu cầu</a></li>
                 <li><a href="/admin/reports" onclick="closeSidebar()">Báo cáo</a></li>
                 <li><a href="/auth/logout">Đăng xuất</a></li>
             </ul>
         </nav>
     </aside>
     <main class="content">
+        {% if request.endpoint not in ['admin.employee_new', 'admin.employee_edit', 'admin.employees', 'admin.attendance'] %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages" style="margin-bottom: 18px; display: flex; flex-direction: column; gap: 10px;">
+                    {% for category, message in messages %}
+                        {% if category == 'success' %}
+                            <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #0f766e; background: #ecfdf5; color: #166534; box-shadow: 0 4px 10px rgba(15, 118, 110, 0.08);">
+                        {% elif category == 'danger' or category == 'error' %}
+                            <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #b91c1c; background: #fff1f2; color: #991b1b; box-shadow: 0 4px 10px rgba(185, 28, 28, 0.08);">
+                        {% elif category == 'warning' %}
+                            <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #d97706; background: #fff7ed; color: #9a3412; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.08);">
+                        {% else %}
+                            <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #14b8a6; background: #ecfeff; color: #0e7490; box-shadow: 0 4px 10px rgba(20, 184, 166, 0.08);">
+                        {% endif %}
+                            {{ message|safe }}
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
     <script>
@@ -127,6 +150,17 @@
             sidebar.classList.remove('open');
             overlay.classList.remove('open');
         }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            if (window.flatpickr) {
+                flatpickr('.date-picker', {
+                    dateFormat: 'd/m/Y',
+                    allowInput: true
+                });
+            }
+        });
     </script>
 </body>
 </html>

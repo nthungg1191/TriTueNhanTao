@@ -1,0 +1,57 @@
+{% extends 'layouts/employee_base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Xin chào {{ employee.name }}</h1>
+    <small>Mã NV: {{ employee.employee_code }}</small>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-header">
+            <div class="stat-title">Tổng công tháng</div>
+            <div class="stat-icon green">📆</div>
+        </div>
+        <div class="stat-value">{{ '%.2f'|format(total_points) }}</div>
+    </div>
+    <div class="stat-card">
+            <div class="stat-header">
+            <div class="stat-title">Công</div>
+            <div class="stat-icon blue">⏱️</div>
+        </div>
+        <div class="stat-value">{{ total_working_hours }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-header">
+            <div class="stat-title">Tăng ca (công)</div>
+            <div class="stat-icon orange">⚡</div>
+        </div>
+        <div class="stat-value">{{ '%.2f'|format(total_overtime) }}</div>
+    </div>
+</div>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr><th>Ngày</th><th>Trạng thái</th><th>Công</th><th>Tăng ca (công)</th><th>OT (h)</th></tr>
+        </thead>
+        <tbody>
+        {% for a in attendances %}
+            {% set status_class = 'success' if a.status == 'present' else 'warning' if a.status == 'late' else 'danger' if a.status == 'absent' else 'info' %}
+            <tr>
+                <td>{{ a.date }}</td>
+                <td><span class="badge badge-{{ status_class }}">{{ a.get_status_label() }}</span></td>
+                <td>{{ a.working_hours }}</td>
+                <td>{{ '%.2f'|format(a.overtime_hours or 0) }}</td>
+                <td>{{ a.to_dict()['overtime_actual_hours'] if a.to_dict()['overtime_actual_hours'] is not none else '--' }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5">Không có dữ liệu chấm công.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
