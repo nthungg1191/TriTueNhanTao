@@ -4,9 +4,15 @@ import io
 import logging
 from typing import Optional
 from flask import Blueprint, request, jsonify
-from app.services.face_detection import FaceDetector
-from app.services.face_service import FaceService
+try:
+    from app.services.face_detection import FaceDetector
+    from app.services.face_service import FaceService
+    face_detector = FaceDetector()
+except Exception:
+    FaceService = None
+    face_detector = None
 from app import db
+from app.models import Employee
 from app.utils.image_utils import ImageProcessor
 import numpy as np
 from PIL import Image
@@ -18,7 +24,7 @@ logger = logging.getLogger(__name__)
 face_api = Blueprint('face_api', __name__, url_prefix='/api/face')
 
 # Initialize services
-face_detector = FaceDetector()
+# face_detector already initialized (or None) above
 
 # Legacy /register endpoint removed - use /register-multi instead
 
@@ -50,6 +56,10 @@ def recognize_face():
                 'message': 'Dữ liệu ảnh không hợp lệ'
             }), 400
         
+        # Check service availability
+        if face_detector is None:
+            return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
+
         # Process image for face detection
         result = face_detector.process_image(image)
         
@@ -71,11 +81,23 @@ def recognize_face():
         # Recognize employee using multi-embedding system
         face_service = FaceService(db.session)
         recognition_result = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
-        
+
+        if recognition_result.get('success') and recognition_result.get('employee_code'):
+            employee = Employee.query.filter_by(employee_code=recognition_result['employee_code']).first()
+            if employee:
+                recognition_result['employee_name'] = employee.name
+        else:
+            # Normalize unrecognized face messages for kiosk display
+            if recognition_result.get('message') in [
+                'No registered faces found',
+                'No matching face found. Please register your face.'
+            ]:
+                recognition_result['message'] = 'Nhân viên chưa có mặt trong hệ thống. Vui lòng liên hệ quản trị viên.'
+
         return jsonify(recognition_result), 200
-        
+
     except Exception as e:
-        logger.error(f"Lỗi nhận dạng khuôn mặt: {str(e)}")
+        logger.error(f'Lỗi nhận dạng khuôn mặt: {str(e)}')
         return jsonify({
             'success': False,
             'message': f'Nhận dạng thất bại: {str(e)}'
@@ -109,6 +131,9 @@ def detect_faces():
                 'message': 'Dữ liệu ảnh không hợp lệ'
             }), 400
         
+        if face_detector is None:
+            return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
+
         # Detect faces
         result = face_detector.process_image(image)
         
@@ -146,6 +171,8 @@ def detect_faces():
 @face_api.route('/employee/<employee_code>', methods=['GET'])
 def get_employee_face(employee_code):
     try:
+        if FaceService is None:
+            return jsonify({'success': False, 'message': 'Face service not available on this environment.'}), 500
         face_service = FaceService(db.session)
         encoding = face_service.get_employee_face_encoding(employee_code)
         
@@ -234,6 +261,8 @@ def register_face_multi():
         
         face_service = FaceService(db.session)
         
+        if face_detector is None:
+            return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
         # Detect and encode face
         result_detect = face_detector.process_image(image)
         if result_detect['faces_found'] != 1:

@@ -169,6 +169,11 @@ class NotificationService:
     def send_notification(employee_id: int, notification_type: str, message: str, 
                          priority: str = 'medium', metadata: Optional[Dict] = None):
         """Gửi thông báo cho nhân viên (lưu vào log)"""
+        from flask import current_app
+        import smtplib
+        from email.message import EmailMessage
+
+        # Log the notification in system logs
         log = SystemLog.log_action(
             user_id=None,  # System notification
             action=f'notification_{notification_type}',
@@ -177,7 +182,38 @@ class NotificationService:
             details=message,
             status='success'
         )
-        
+
+        # Try sending email if SMTP configured and employee has email
+        try:
+            smtp_host = current_app.config.get('SMTP_HOST')
+            smtp_port = int(current_app.config.get('SMTP_PORT', 0) or 0)
+            smtp_user = current_app.config.get('SMTP_USER')
+            smtp_pass = current_app.config.get('SMTP_PASS')
+            mail_from = current_app.config.get('MAIL_FROM') or smtp_user
+
+            if smtp_host and smtp_port and smtp_user and smtp_pass:
+                emp = Employee.query.get(employee_id)
+                if emp and emp.email:
+                    msg = EmailMessage()
+                    msg['Subject'] = f"Thông báo: {notification_type}"
+                    msg['From'] = mail_from
+                    msg['To'] = emp.email
+                    msg.set_content(message)
+
+                    # Use SSL for common secure ports
+                    if smtp_port in (465,):
+                        server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10)
+                    else:
+                        server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
+                        server.starttls()
+
+                    server.login(smtp_user, smtp_pass)
+                    server.send_message(msg)
+                    server.quit()
+        except Exception:
+            # Don't fail the main flow if email sending fails; we already logged the notification
+            pass
+
         return log
     
     @staticmethod

@@ -117,5 +117,9 @@ class User(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     """Load user by ID for Flask-Login"""
-    return User.query.get(int(user_id))
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    return User.query.get(user_id)
 

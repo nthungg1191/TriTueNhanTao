@@ -7,6 +7,7 @@ from typing import List, Tuple, Optional, Dict, Any
 from PIL import Image
 import io
 import base64
+from flask import has_app_context, current_app
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +15,21 @@ logger = logging.getLogger(__name__)
 class FaceDetector:
     """Face detection and recognition service"""
     
-    def __init__(self, model: str = 'hog', tolerance: float = 0.4):
+    def __init__(self, model: str = 'hog', tolerance: float = None, upsample: int = 0):
+
+        if tolerance is None:
+            if has_app_context():
+                tolerance = float(current_app.config.get('FACE_RECOGNITION_TOLERANCE', 0.5))
+            else:
+                tolerance = float(os.getenv('FACE_RECOGNITION_TOLERANCE', 0.5))
 
         self.model = model
         self.tolerance = tolerance
+        self.upsample = upsample
         self.known_face_encodings = []
         self.known_face_names = []
         
-        logger.info(f"FaceDetector initialized with model: {model}, tolerance: {tolerance}")
+        logger.info(f"FaceDetector initialized with model: {model}, tolerance: {tolerance}, upsample: {upsample}")
     
     def detect_faces(self, image: np.ndarray) -> List[Tuple[int, int, int, int]]:
         """
@@ -40,7 +48,8 @@ class FaceDetector:
             # Find face locations
             face_locations = face_recognition.face_locations(
                 rgb_image, 
-                model=self.model
+                model=self.model,
+                number_of_times_to_upsample=self.upsample
             )
             
             logger.debug(f"Detected {len(face_locations)} faces")

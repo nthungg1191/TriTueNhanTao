@@ -17,7 +17,7 @@
     }
     .page-header h1 {
         font-size: 28px;
-        color: #2c3e50;
+        color: #1f2937;
         margin: 0;
     }
     .page-actions {
@@ -34,7 +34,7 @@
         display: flex;
         gap: 16px;
         flex-wrap: wrap;
-        align-items: center;
+        align-items: flex-end;
     }
     .filter-group {
         display: flex;
@@ -43,7 +43,7 @@
     }
     .filter-group label {
         font-size: 13px;
-        color: #5a6c7d;
+        color: #64748b;
         font-weight: 500;
     }
     .filter-select {
@@ -58,8 +58,42 @@
     }
     .filter-select:focus {
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        border-color: #14b8a6;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    }
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+    }
+    .filter-actions .btn {
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .filter-actions .btn-primary {
+        background: linear-gradient(135deg, #14b8a6, #0f766e);
+        color: white;
+    }
+    .filter-actions .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.28);
+    }
+    .filter-actions .btn-secondary {
+        background: #eef2f7;
+        color: #64748b;
+    }
+    .filter-actions .btn-secondary:hover {
+        background: #e5e7eb;
+        transform: translateY(-2px);
     }
     .stats-bar {
         display: flex;
@@ -73,10 +107,10 @@
         border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         font-size: 14px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     .stat-badge strong {
-        color: #2c3e50;
+        color: #1f2937;
         margin-left: 8px;
     }
     .table-view {
@@ -93,24 +127,24 @@
         border-collapse: collapse;
     }
     .table thead {
-        background: #f8f9fa;
+        background: #ecfdf5;
     }
     .table th {
         padding: 16px;
         text-align: left;
         font-weight: 600;
         font-size: 13px;
-        color: #5a6c7d;
+        color: #1f2937;
         text-transform: uppercase;
-        border-bottom: 2px solid #e0e0e0;
+        border-bottom: 2px solid #d7e3ea;
     }
     .table td {
         padding: 16px;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid #e5e7eb;
         vertical-align: middle;
     }
     .table tbody tr:hover {
-        background: #f8f9fa;
+        background: #f8fbfb;
     }
     .table tbody tr:last-child td {
         border-bottom: none;
@@ -123,12 +157,12 @@
         font-weight: 600;
     }
     .badge-success {
-        background: #e8f5e9;
-        color: #4caf50;
+        background: #ecfdf5;
+        color: #166534;
     }
     .badge-secondary {
-        background: #eceff1;
-        color: #607d8b;
+        background: #eef2f7;
+        color: #64748b;
     }
     .actions {
         display: flex;
@@ -144,25 +178,25 @@
         cursor: pointer;
     }
     .btn-edit {
-        background: #e3f2fd;
-        color: #2196f3;
+        background: #ecfeff;
+        color: #0e7490;
     }
     .btn-edit:hover {
-        background: #2196f3;
+        background: #0e7490;
         color: white;
     }
     .btn-delete {
-        background: #ffebee;
-        color: #f44336;
+        background: #fff1f2;
+        color: #b91c1c;
     }
     .btn-delete:hover {
-        background: #f44336;
+        background: #b91c1c;
         color: white;
     }
     .empty-state {
         text-align: center;
         padding: 60px 20px;
-        color: #7f8c8d;
+        color: #64748b;
     }
     .empty-state-icon {
         font-size: 64px;
@@ -171,7 +205,7 @@
     }
     .empty-state h3 {
         font-size: 20px;
-        color: #5a6c7d;
+        color: #64748b;
         margin-bottom: 8px;
     }
     .empty-state p {
@@ -185,11 +219,11 @@
     }
     .day-badge {
         padding: 4px 8px;
-        background: #f0f0f0;
+        background: #eef2f7;
         border-radius: 4px;
         font-size: 11px;
         font-weight: 600;
-        color: #5a6c7d;
+        color: #64748b;
     }
     @media (max-width: 768px) {
         .schedules-page {
@@ -208,6 +242,15 @@
         }
         .filter-select {
             width: 100%;
+        }
+        .filter-actions {
+            flex-direction: row;
+            width: 100%;
+            gap: 10px;
+        }
+        .filter-actions .btn {
+            flex: 1;
+            justify-content: center;
         }
         .table-container {
             overflow-x: scroll;
@@ -258,9 +301,9 @@
             </select>
         </div>
         
-        <div class="filter-group" style="align-self: flex-end;">
-            <button type="submit" class="btn btn-primary" style="margin-top: 0;">🔍 Lọc</button>
-            <a href="{{ url_for('admin.schedules') }}" class="btn btn-secondary" style="margin-top: 8px;">🔄 Xóa bộ lọc</a>
+        <div class="filter-actions">
+            <button type="submit" class="btn btn-primary">🔍 Lọc</button>
+            <a href="{{ url_for('admin.schedules') }}" class="btn btn-secondary">🔄 Xóa bộ lọc</a>
         </div>
     </form>
 
@@ -284,9 +327,8 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Nhân viên</th>
+                                <th>Nhân viên</th>
                         <th>Giờ làm việc</th>
-                        <th>Ngày áp dụng</th>
                         <th>Ngày làm việc</th>
                         <th>Trạng thái</th>
                         <th>Ghi chú</th>
@@ -298,21 +340,11 @@
                     <tr>
                         <td>
                             <strong>{{ schedule.employee.employee_code }}</strong><br>
-                            <small style="color: #7f8c8d;">{{ schedule.employee.name }}</small>
+                            <small style="color: #64748b;">{{ schedule.employee.name }}</small>
                         </td>
                         <td>
                             <strong>{{ schedule.shift_start.strftime('%H:%M') }}</strong> - 
                             <strong>{{ schedule.shift_end.strftime('%H:%M') }}</strong>
-                        </td>
-                        <td>
-                            {% if schedule.effective_from %}
-                                <strong>Từ:</strong> {{ schedule.effective_from.strftime('%d/%m/%Y') }}<br>
-                            {% endif %}
-                            {% if schedule.effective_to %}
-                                <strong>Đến:</strong> {{ schedule.effective_to.strftime('%d/%m/%Y') }}
-                            {% else %}
-                                <span style="color: #7f8c8d;">Không giới hạn</span>
-                            {% endif %}
                         </td>
                         <td>
                             {% if schedule.work_days %}
@@ -325,7 +357,7 @@
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                <span style="color: #7f8c8d;">Tất cả các ngày</span>
+                                <span style="color: #64748b;">Tất cả các ngày</span>
                             {% endif %}
                         </td>
                         <td>
@@ -337,7 +369,7 @@
                         </td>
                         <td>
                             {% if schedule.notes %}
-                                <small style="color: #7f8c8d;">{{ schedule.notes[:50] }}{% if schedule.notes|length > 50 %}...{% endif %}</small>
+                                <small style="color: #64748b;">{{ schedule.notes[:50] }}{% if schedule.notes|length > 50 %}...{% endif %}</small>
                             {% else %}
                                 <span style="color: #bdc3c7;">—</span>
                             {% endif %}

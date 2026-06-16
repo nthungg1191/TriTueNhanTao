@@ -1,0 +1,43 @@
+{% extends 'layouts/employee_base.html' %}
+
+{% block title %}Hồ sơ nhân viên{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Hồ sơ cá nhân</h1>
+    <small>Thông tin cơ bản của bạn</small>
+</div>
+
+<div class="card">
+    <div class="info-grid">
+        <div class="info-item">
+            <label>Mã nhân viên</label>
+            <div class="value">{{ employee.employee_code }}</div>
+        </div>
+        <div class="info-item">
+            <label>Họ và tên</label>
+            <div class="value">{{ employee.name }}</div>
+        </div>
+        <div class="info-item">
+            <label>Email</label>
+            <div class="value">{{ employee.email or 'Chưa có' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Điện thoại</label>
+            <div class="value">{{ employee.phone or 'Chưa có' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Phòng ban</label>
+            <div class="value">{{ employee.get_department_name() or 'Chưa có' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Chức vụ</label>
+            <div class="value">{{ employee.position or 'Chưa có' }}</div>
+        </div>
+        <div class="info-item">
+            <label>Ngày vào làm</label>
+            <div class="value">{{ employee.hire_date or 'Chưa có' }}</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

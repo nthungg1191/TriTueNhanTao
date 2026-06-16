@@ -75,7 +75,7 @@
     }
     .form-group label {
         font-weight: 600;
-        color: #2c3e50;
+        color: #1f2937;
         font-size: 14px;
     }
     .form-group .form-control,
@@ -92,7 +92,7 @@
     .form-group select:focus,
     .form-group textarea:focus {
         outline: none;
-        border-color: #667eea;
+        border-color: #14b8a6;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
     }
     .form-group textarea {
@@ -150,7 +150,7 @@
     .face-card h3,
     .face-card h4 {
         margin: 0;
-        color: #2c3e50;
+        color: #1f2937;
     }
     .face-card h3 {
         font-size: 20px;
@@ -170,9 +170,9 @@
         color: #555;
     }
     .face-alert {
-        background: #e3f2fd;
-        border-left: 4px solid #2196f3;
-        color: #0d47a1;
+        background: #ecfeff;
+        border-left: 4px solid #0e7490;
+        color: #0e7490;
     }
     .face-actions {
         display: flex;
@@ -191,7 +191,7 @@
         gap: 12px;
     }
     .video-frame {
-        border: 2px solid #e0e0e0;
+        border: 2px solid #d7e3ea;
         border-radius: 10px;
         background: #000;
         overflow: hidden;
@@ -200,16 +200,17 @@
         width: 100%;
         height: auto;
         display: block;
+        transform: scaleX(-1);
     }
     .recording-panel {
         display: none;
     }
     .recording-panel .recording-alert {
         padding: 12px;
-        background: #ffebee;
-        border-left: 4px solid #f44336;
+        background: #fff1f2;
+        border-left: 4px solid #b91c1c;
         border-radius: 10px;
-        color: #c62828;
+        color: #b91c1c;
     }
     .recorded-controls {
         display: flex;
@@ -276,10 +277,30 @@
         <a href="{{ url_for('admin.employees') }}" class="btn btn-secondary">Quay lại</a>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages" style="margin-bottom: 18px; display: flex; flex-direction: column; gap: 10px;">
+            {% for category, message in messages %}
+                {% if category == 'success' %}
+                    <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #0f766e; background: #ecfdf5; color: #166534; box-shadow: 0 4px 10px rgba(15, 118, 110, 0.08);">
+                {% elif category == 'danger' or category == 'error' %}
+                    <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #b91c1c; background: #fff1f2; color: #991b1b; box-shadow: 0 4px 10px rgba(185, 28, 28, 0.08);">
+                {% elif category == 'warning' %}
+                    <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #d97706; background: #fff7ed; color: #9a3412; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.08);">
+                {% else %}
+                    <div style="padding: 14px 16px; border-radius: 12px; border-left: 5px solid #14b8a6; background: #ecfeff; color: #0e7490; box-shadow: 0 4px 10px rgba(20, 184, 166, 0.08);">
+                {% endif %}
+                    {{ message|safe }}
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
 {% set current_department = request.form.get('department_id', employee.department_id if employee else '') %}
 {% set is_active_checked = (request.method == 'POST' and request.form.get('is_active') is not none) or (request.method != 'POST' and (not employee or employee.is_active)) %}
 
-    <form method="POST" class="form-container">
+    <form method="POST" enctype="multipart/form-data" class="form-container">
     <div class="form-section">
         <div class="section-header">
             <div>
@@ -297,10 +318,11 @@
                        name="employee_code"
                        id="employee_code"
                        class="form-control"
-                       value="{{ request.form.get('employee_code', employee.employee_code if employee else '') }}"
+                       value="{{ request.form.get('employee_code', employee.employee_code if employee else new_employee_code) }}"
                        placeholder="Ví dụ: NV001"
+                       {% if not employee %}readonly{% endif %}
                        required>
-                <small class="helper-text">Mã dùng cho chấm công, báo cáo và tìm kiếm.</small>
+                <small class="helper-text">Mã dùng cho chấm công, báo cáo và tìm kiếm. Mã nhân viên cũng sẽ là tên đăng nhập.</small>
             </div>
             <div class="form-group">
                 <label for="name">Tên nhân viên *</label>
@@ -311,6 +333,29 @@
                        value="{{ request.form.get('name', employee.name if employee else '') }}"
                        placeholder="Ví dụ: Nguyễn Văn A"
                        required>
+            </div>
+            <div class="form-group">
+                <label for="password">Mật khẩu tài khoản</label>
+                <input type="password"
+                       name="password"
+                       id="password"
+                       class="form-control"
+                       placeholder="Nhập mật khẩu nhân viên">
+                <small class="helper-text">
+                    {% if employee %}
+                        Để trống nếu không đổi mật khẩu.
+                    {% else %}
+                        Để trống sẽ dùng mật khẩu mặc định là mã nhân viên viết thường.
+                    {% endif %}
+                </small>
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Xác nhận mật khẩu</label>
+                <input type="password"
+                       name="confirm_password"
+                       id="confirm_password"
+                       class="form-control"
+                       placeholder="Nhập lại mật khẩu">
             </div>
             <div class="form-group">
                 <label for="department_id">Phòng ban</label>
@@ -340,6 +385,7 @@
                        id="hire_date"
                        class="form-control"
                        value="{{ request.form.get('hire_date', employee.hire_date.strftime('%Y-%m-%d') if employee and employee.hire_date else '') }}">
+                <small class="helper-text">Chọn ngày (YYYY-MM-DD)</small>
             </div>
         </div>
     </div>
@@ -364,14 +410,16 @@
             </div>
             <div class="form-group">
                 <label for="phone">Điện thoại</label>
-                <input type="text"
-                       name="phone"
-                       id="phone"
-                       class="form-control"
-                       value="{{ request.form.get('phone', employee.phone if employee else '') }}"
-                       pattern="[0-9+\-\s()]+"
-                       placeholder="Ví dụ: 0123456789">
-                <small class="helper-text">Chỉ nhập số, dấu +, -, khoảng trắng và dấu ngoặc.</small>
+                  <input type="text"
+                      name="phone"
+                      id="phone"
+                      class="form-control"
+                      value="{{ request.form.get('phone', employee.phone if employee else '') }}"
+                      pattern="^\d{10}$"
+                      inputmode="numeric"
+                      maxlength="10"
+                      placeholder="Ví dụ: 0333367890">
+                  <small class="helper-text">Chỉ nhập 10 chữ số (ví dụ: 0333367890). Không nhập chữ hoặc ký tự khác.</small>
             </div>
         </div>
     </div>
@@ -405,115 +453,39 @@
             </div>
         </div>
     </div>
-    <!-- Face Encoding Management Section -->
     {% if employee %}
     <div class="face-section">
-        <h3>📷 Quản lý Face Recognition (Multi-Embedding)</h3>
-
-        <div class="face-card">
-            <div id="embeddingsList">
-                <h4>Danh sách Face Embeddings</h4>
-                <div id="embeddingsContainer" class="face-info">
-                    <span id="embeddingsLoading">Đang tải...</span>
-                </div>
-            </div>
-
-            <div id="faceEncodingStatus" class="face-status" style="display: none;"></div>
-
-            <div class="face-upload-section">
-                <h4>Thêm Face Embedding Mới</h4>
-                <p class="section-subtitle">Chụp 2-3 ảnh khuôn mặt từ webcam</p>
-
-                <div class="face-alert">
-                    <strong>💡 Hướng dẫn:</strong> Chụp 2-3 ảnh với các góc độ khác nhau (chính diện, hơi nghiêng trái/phải) để tăng độ chính xác nhận diện. Mỗi ảnh sẽ được lưu như một embedding riêng.
-                </div>
-
-                <div class="face-actions">
-                    <button type="button"
-                            id="btnStartCamera"
-                            onclick="startCamera()"
-                            class="btn btn-primary">
-                        📷 Bật Camera
-                    </button>
-                    <button type="button"
-                            id="btnStopCamera"
-                            onclick="stopCamera()"
-                            class="btn btn-secondary"
-                            style="display: none;">
-                        🛑 Tắt Camera
-                    </button>
-                    <button type="button"
-                            id="btnCapture"
-                            onclick="capturePhoto()"
-                            class="btn btn-success"
-                            style="display: none;">
-                        📸 Chụp ảnh
-                    </button>
-                </div>
-
-                <div id="captureProgress" style="display: none; margin-top: 16px;">
-                    <div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 8px; color: #0d47a1;">
-                        <strong>📊 Tiến độ:</strong> 
-                        <span id="captureCount">0</span>/3 ảnh đã chụp
-                        <div style="margin-top: 8px; font-size: 13px;">
-                            <span id="captureStatus">Hãy chụp thêm ảnh để đạt chất lượng tốt nhất</span>
-                        </div>
-                    </div>
-                </div>
-
-                <small class="face-empty-message">
-                    Bật camera và đảm bảo khuôn mặt rõ ràng, chỉ có 1 người trong khung hình. Nhấn "Chụp ảnh" để chụp từng ảnh. Khuyến nghị: chụp 2-3 ảnh với các góc độ khác nhau.
-                </small>
-
-                <div class="face-video-grid">
-                    <div id="cameraPreview" class="video-preview">
-                        <div class="video-frame">
-                            <video id="videoElement" autoplay playsinline></video>
-                            <canvas id="canvasElement" style="display: none;"></canvas>
-                        </div>
-                    </div>
-
-                    <div id="capturedPhotosContainer" style="display: none; grid-column: 1 / -1;">
-                        <h5 style="margin: 16px 0 12px 0; color: #2c3e50;">Ảnh đã chụp:</h5>
-                        <div id="capturedPhotosList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px;"></div>
-                        <div class="recorded-controls">
-                            <div>
-                                <label for="photosDescription">Mô tả chung cho tất cả embeddings:</label>
-                                <input type="text"
-                                       id="photosDescription"
-                                       class="form-control"
-                                       placeholder="Ví dụ: Đăng ký lần đầu, buổi sáng, etc.">
-                            </div>
-                            <label class="inline-checkbox">
-                                <input type="checkbox" id="setFirstAsPrimary">
-                                <span>Đặt ảnh đầu tiên làm embedding chính</span>
-                            </label>
-                            <div class="face-actions" style="gap: 8px;">
-                                <button type="button"
-                                        onclick="confirmPhotosRegister()"
-                                        id="btnConfirmRegister"
-                                        class="btn btn-success">
-                                    ✓ Xác nhận & Tạo Embeddings
-                                </button>
-                                <button type="button"
-                                        onclick="clearCapturedPhotos()"
-                                        class="btn btn-secondary">
-                                    Xóa tất cả & Chụp lại
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="faceUploadMessage" class="face-status" style="display: none;"></div>
-            </div>
-        </div>
-    </div>
-    {% else %}
-    <div class="face-section">
-        <h3>📷 Quản lý Face Recognition</h3>
+        <h3>📷 Chụp 3 góc khuôn mặt</h3>
         <div class="face-alert">
-            Sau khi tạo nhân viên, bạn có thể quay lại để chụp ảnh từ webcam và đăng ký face encoding.
+            Chụp đủ 3 góc (chính diện, nghiêng trái, nghiêng phải) để tăng độ chính xác khi chấm công.
+        </div>
+        <div class="face-card">
+            <div class="face-actions">
+                <button type="button" class="btn btn-primary" id="btnStartCam">Bật camera</button>
+                <button type="button" class="btn btn-secondary" id="btnStopCam" style="display:none;">Tắt camera</button>
+                <button type="button" class="btn btn-success" id="btnCapture" style="display:none;">Chụp ảnh</button>
+                <button type="button" class="btn btn-danger" id="btnResetShots" style="display:none;">Xóa ảnh đã chụp</button>
+            </div>
+
+            <div class="face-video-grid">
+                <div id="cameraPreview" class="video-preview">
+                    <div class="video-frame">
+                        <video id="videoElement" autoplay playsinline muted></video>
+                        <canvas id="canvasElement" style="display:none;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="captureProgress" class="face-info" style="display:none;"></div>
+            <div id="capturedPhotos" class="face-info" style="display:none;"></div>
+
+            <div class="recorded-controls" id="uploadControls" style="display:none;">
+                <div class="face-actions">
+                    <button type="button" class="btn btn-primary" id="btnUploadShots">Lưu 3 ảnh nhận diện</button>
+                </div>
+            </div>
+
+            <div id="faceUploadMessage" class="face-status" style="display:none;"></div>
         </div>
     </div>
     {% endif %}
@@ -527,490 +499,166 @@
 
 {% if employee %}
 <script>
-let cameraStream = null;
-let capturedPhotos = []; // Array to store captured photos (base64)
 const employeeCode = '{{ employee.employee_code }}';
-const MIN_PHOTOS = 2; // Minimum recommended photos
-const MAX_PHOTOS = 3; // Maximum recommended photos
+const shotLabels = ['Chính diện', 'Nghiêng trái', 'Nghiêng phải'];
+let stream = null;
+let shots = [];
 
-// Load embeddings list on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadEmbeddings();
-});
+const btnStartCam = document.getElementById('btnStartCam');
+const btnStopCam = document.getElementById('btnStopCam');
+const btnCapture = document.getElementById('btnCapture');
+const btnResetShots = document.getElementById('btnResetShots');
+const btnUploadShots = document.getElementById('btnUploadShots');
 
-// Load embeddings list
-async function loadEmbeddings() {
-    const container = document.getElementById('embeddingsContainer');
-    container.innerHTML = '<div style="padding: 12px; background: #f5f5f5; border-radius: 8px; color: #666;">Đang tải...</div>';
-    
-    try {
-        const response = await fetch(`/api/face/embeddings/${employeeCode}`);
-        const result = await response.json();
-        
-        if (result.success && result.embeddings && result.embeddings.length > 0) {
-            let html = '<div style="display: grid; gap: 12px;">';
-            
-            result.embeddings.forEach(embedding => {
-                const isPrimary = embedding.is_primary ? '<span style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">PRIMARY</span>' : '';
-                const variantLabel = {
-                    'default': 'Mặc định',
-                    'no_glasses': 'Không kính',
-                    'with_glasses': 'Có kính',
-                    'profile_left': 'Góc trái',
-                    'profile_right': 'Góc phải',
-                    'other': 'Khác'
-                }[embedding.variant_type] || embedding.variant_type;
-                
-                html += `
-                    <div style="padding: 12px; background: white; border: 1px solid #e0e0e0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 500; margin-bottom: 4px;">
-                                ${variantLabel} ${isPrimary}
-                            </div>
-                            ${embedding.description ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;">${embedding.description}</div>` : ''}
-                            <div style="font-size: 11px; color: #999;">
-                                Loại: ${embedding.embedding_type} | 
-                                Tạo: ${new Date(embedding.created_at).toLocaleString('vi-VN')}
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 8px;">
-                            ${!embedding.is_primary ? `
-                                <button onclick="setPrimaryEmbedding(${embedding.id})" 
-                                        class="btn btn-sm" 
-                                        style="padding: 6px 12px; background: #2196f3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                    ⭐ Đặt làm chính
-                                </button>
-                            ` : ''}
-                            <button onclick="deleteEmbedding(${embedding.id})" 
-                                    class="btn btn-sm" 
-                                    style="padding: 6px 12px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                                🗑️ Xóa
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            container.innerHTML = html;
-            
-            // Update status
-            const statusDiv = document.getElementById('faceEncodingStatus');
-            statusDiv.innerHTML = `
-                <div class="alert alert-success" style="padding: 12px; border-radius: 8px; background: #e8f5e9; color: #4caf50; border-left: 4px solid #4caf50;">
-                    <strong>✓ Đã có ${result.total_embeddings} face embedding(s)</strong>
-                    <p style="margin: 8px 0 0 0; font-size: 13px;">Nhân viên này có thể sử dụng face recognition để chấm công.</p>
-                </div>
-            `;
-            statusDiv.style.display = 'block';
-        } else {
-            container.innerHTML = `
-                <div style="padding: 12px; background: #ffebee; color: #f44336; border-radius: 8px; border-left: 4px solid #f44336;">
-                    <strong>⚠ Chưa có face embedding</strong>
-                    <p style="margin: 8px 0 0 0; font-size: 13px;">Hãy chụp ảnh từ webcam để đăng ký face embedding đầu tiên.</p>
-                </div>
-            `;
-            
-            const statusDiv = document.getElementById('faceEncodingStatus');
-            statusDiv.innerHTML = `
-                <div class="alert alert-danger" style="padding: 12px; border-radius: 8px; background: #ffebee; color: #f44336; border-left: 4px solid #f44336;">
-                    <strong>⚠ Chưa có face encoding</strong>
-                    <p style="margin: 8px 0 0 0; font-size: 13px;">Nhân viên này chưa thể sử dụng face recognition. Hãy chụp ảnh trực tiếp từ webcam để đăng ký.</p>
-                </div>
-            `;
-            statusDiv.style.display = 'block';
-        }
-    } catch (error) {
-        console.error('Error loading embeddings:', error);
-        container.innerHTML = `
-            <div style="padding: 12px; background: #ffebee; color: #f44336; border-radius: 8px;">
-                Lỗi khi tải danh sách embeddings: ${error.message}
-            </div>
-        `;
-    }
+const cameraPreview = document.getElementById('cameraPreview');
+const video = document.getElementById('videoElement');
+const canvas = document.getElementById('canvasElement');
+const captureProgress = document.getElementById('captureProgress');
+const capturedPhotos = document.getElementById('capturedPhotos');
+const uploadControls = document.getElementById('uploadControls');
+const messageBox = document.getElementById('faceUploadMessage');
+
+function showFaceMessage(msg, type = 'info') {
+    const map = {
+        success: { bg: '#ecfdf5', fg: '#166534', border: '#0f766e' },
+        warning: { bg: '#fff7ed', fg: '#9a3412', border: '#d97706' },
+        error: { bg: '#fff1f2', fg: '#991b1b', border: '#b91c1c' },
+        info: { bg: '#ecfeff', fg: '#0e7490', border: '#14b8a6' }
+    };
+    const color = map[type] || map.info;
+    messageBox.style.display = 'block';
+    messageBox.innerHTML = `<div style="padding:12px;border-left:4px solid ${color.border};background:${color.bg};color:${color.fg};border-radius:8px;">${msg}</div>`;
 }
 
-// Set primary embedding
-async function setPrimaryEmbedding(embeddingId) {
-    if (!confirm('Bạn có chắc muốn đặt embedding này làm embedding chính?')) {
-        return;
+function refreshShotUI() {
+    captureProgress.style.display = 'block';
+    captureProgress.innerHTML = `Đã chụp <strong>${shots.length}/3</strong> ảnh. Ảnh tiếp theo: <strong>${shotLabels[Math.min(shots.length, 2)]}</strong>.`;
+
+    if (shots.length > 0) {
+        capturedPhotos.style.display = 'block';
+        capturedPhotos.innerHTML = shots.map((s, i) => `<div>Ảnh ${i + 1}: ${shotLabels[i]} ✓</div>`).join('');
+        btnResetShots.style.display = 'inline-block';
+    } else {
+        capturedPhotos.style.display = 'none';
+        btnResetShots.style.display = 'none';
     }
-    
-    try {
-        const response = await fetch(`/api/face/embedding/${embeddingId}/primary`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showMessage('✓ Đã đặt làm embedding chính!', 'success');
-            loadEmbeddings(); // Reload list
-        } else {
-            showMessage('✗ ' + result.message, 'error');
-        }
-    } catch (error) {
-        console.error('Error setting primary:', error);
-        showMessage('✗ Có lỗi xảy ra: ' + error.message, 'error');
-    }
+
+    uploadControls.style.display = shots.length === 3 ? 'block' : 'none';
 }
 
-// Delete embedding
-async function deleteEmbedding(embeddingId) {
-    if (!confirm('Bạn có chắc muốn xóa embedding này?')) {
-        return;
-    }
-    
+async function startCam() {
     try {
-        const response = await fetch(`/api/face/embedding/${embeddingId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showMessage('✓ Đã xóa embedding!', 'success');
-            loadEmbeddings(); // Reload list
-        } else {
-            showMessage('✗ ' + result.message, 'error');
-        }
-    } catch (error) {
-        console.error('Error deleting embedding:', error);
-        showMessage('✗ Có lỗi xảy ra: ' + error.message, 'error');
-    }
-}
-
-// Start camera
-async function startCamera() {
-    try {
-        const video = document.getElementById('videoElement');
-        const cameraPreview = document.getElementById('cameraPreview');
-        const btnStart = document.getElementById('btnStartCamera');
-        const btnStop = document.getElementById('btnStopCamera');
-        const btnCapture = document.getElementById('btnCapture');
-        
-        // Request camera access
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'user',
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            },
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
             audio: false
         });
-        
-        video.srcObject = cameraStream;
+        video.srcObject = stream;
+        video.style.transform = 'scaleX(-1)';
         cameraPreview.style.display = 'flex';
-        btnStart.style.display = 'none';
-        btnStop.style.display = 'inline-block';
+        btnStartCam.style.display = 'none';
+        btnStopCam.style.display = 'inline-block';
         btnCapture.style.display = 'inline-block';
-        
-        showMessage('Camera đã được bật thành công. Hãy đảm bảo khuôn mặt rõ ràng trong khung hình. Nhấn "Chụp ảnh" để chụp từng ảnh.', 'success');
-    } catch (error) {
-        console.error('Camera error:', error);
-        showMessage('Không thể truy cập camera. Vui lòng kiểm tra quyền truy cập và đảm bảo camera không đang được sử dụng bởi ứng dụng khác.', 'error');
+        showFaceMessage('Camera đã bật. Chụp lần lượt: chính diện, nghiêng trái, nghiêng phải.', 'info');
+    } catch (err) {
+        showFaceMessage('Không thể truy cập camera. Hãy kiểm tra quyền trình duyệt.', 'error');
     }
 }
 
-// Stop camera
-function stopCamera() {
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-        
-        const video = document.getElementById('videoElement');
-        const cameraPreview = document.getElementById('cameraPreview');
-        const btnStart = document.getElementById('btnStartCamera');
-        const btnStop = document.getElementById('btnStopCamera');
-        const btnCapture = document.getElementById('btnCapture');
-        
-        video.srcObject = null;
-        cameraPreview.style.display = 'none';
-        btnStart.style.display = 'inline-block';
-        btnStop.style.display = 'none';
-        btnCapture.style.display = 'none';
-        
-        // Hide captured photos container
-        document.getElementById('capturedPhotosContainer').style.display = 'none';
-        document.getElementById('captureProgress').style.display = 'none';
+function stopCam() {
+    if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+        stream = null;
     }
+    video.srcObject = null;
+    cameraPreview.style.display = 'none';
+    btnStartCam.style.display = 'inline-block';
+    btnStopCam.style.display = 'none';
+    btnCapture.style.display = 'none';
 }
 
-// Capture photo from video stream
-function capturePhoto() {
-    if (!cameraStream) {
-        showMessage('Vui lòng bật camera trước!', 'error');
+function captureShot() {
+    if (!stream) {
+        showFaceMessage('Vui lòng bật camera trước.', 'error');
         return;
     }
-    
-    if (capturedPhotos.length >= MAX_PHOTOS) {
-        showMessage(`Đã chụp đủ ${MAX_PHOTOS} ảnh. Vui lòng xác nhận hoặc xóa ảnh để chụp lại.`, 'info');
+    if (shots.length >= 3) {
+        showFaceMessage('Đã đủ 3 ảnh, hãy bấm Lưu 3 ảnh nhận diện.', 'info');
         return;
     }
-    
-    try {
-        const video = document.getElementById('videoElement');
-        const canvas = document.getElementById('canvasElement');
-        const ctx = canvas.getContext('2d');
-        
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        // Draw current video frame to canvas
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert canvas to base64 image
-        const imageData = canvas.toDataURL('image/jpeg', 0.92);
-        
-        // Add to captured photos array
-        capturedPhotos.push(imageData);
-        
-        // Update UI
-        updateCapturedPhotosUI();
-        updateCaptureProgress();
-        
-        // Show success message
-        if (capturedPhotos.length < MIN_PHOTOS) {
-            showMessage(`Đã chụp ${capturedPhotos.length}/${MIN_PHOTOS} ảnh. Khuyến nghị chụp thêm để đạt chất lượng tốt nhất.`, 'info');
-        } else {
-            showMessage(`Đã chụp ${capturedPhotos.length} ảnh. Bạn có thể chụp thêm hoặc xác nhận ngay.`, 'success');
-        }
-        
-    } catch (error) {
-        console.error('Capture error:', error);
-        showMessage('Có lỗi xảy ra khi chụp ảnh: ' + error.message, 'error');
-    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    shots.push(canvas.toDataURL('image/jpeg', 0.9));
+    refreshShotUI();
 }
 
-// Update captured photos UI
-function updateCapturedPhotosUI() {
-    const container = document.getElementById('capturedPhotosContainer');
-    const list = document.getElementById('capturedPhotosList');
-    
-    if (capturedPhotos.length === 0) {
-        container.style.display = 'none';
+async function uploadShots() {
+    if (shots.length !== 3) {
+        showFaceMessage('Cần đúng 3 ảnh để lưu bộ nhận diện.', 'error');
         return;
     }
-    
-    container.style.display = 'block';
-    list.innerHTML = '';
-    
-    capturedPhotos.forEach((photo, index) => {
-        const photoDiv = document.createElement('div');
-        photoDiv.style.cssText = 'position: relative; border: 2px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: #000;';
-        
-        const img = document.createElement('img');
-        img.src = photo;
-        img.style.cssText = 'width: 100%; height: auto; display: block;';
-        
-        const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '🗑️';
-        deleteBtn.style.cssText = 'position: absolute; top: 4px; right: 4px; background: rgba(244, 67, 54, 0.9); color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 14px;';
-        deleteBtn.onclick = () => removePhoto(index);
-        
-        const label = document.createElement('div');
-        label.textContent = `Ảnh ${index + 1}`;
-        label.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.7); color: white; padding: 4px; font-size: 12px; text-align: center;';
-        
-        photoDiv.appendChild(img);
-        photoDiv.appendChild(deleteBtn);
-        photoDiv.appendChild(label);
-        list.appendChild(photoDiv);
-    });
-}
 
-// Remove a photo from the array
-function removePhoto(index) {
-    if (confirm('Bạn có chắc muốn xóa ảnh này?')) {
-        capturedPhotos.splice(index, 1);
-        updateCapturedPhotosUI();
-        updateCaptureProgress();
-        showMessage('Đã xóa ảnh. Bạn có thể chụp lại.', 'info');
-    }
-}
+    btnUploadShots.disabled = true;
+    showFaceMessage('Đang lưu 3 ảnh nhận diện...', 'info');
 
-// Clear all captured photos
-function clearCapturedPhotos() {
-    if (capturedPhotos.length === 0) return;
-    
-    if (confirm('Bạn có chắc muốn xóa tất cả ảnh đã chụp và chụp lại?')) {
-        capturedPhotos = [];
-        updateCapturedPhotosUI();
-        updateCaptureProgress();
-        document.getElementById('photosDescription').value = '';
-        document.getElementById('setFirstAsPrimary').checked = false;
-        showMessage('Đã xóa tất cả ảnh. Bạn có thể chụp lại.', 'info');
-    }
-}
+    const variants = ['default', 'profile_left', 'profile_right'];
+    let ok = 0;
+    let fail = 0;
+    const failedShots = [];
 
-// Update capture progress
-function updateCaptureProgress() {
-    const progressDiv = document.getElementById('captureProgress');
-    const countSpan = document.getElementById('captureCount');
-    const statusSpan = document.getElementById('captureStatus');
-    
-    if (capturedPhotos.length === 0) {
-        progressDiv.style.display = 'none';
-        return;
-    }
-    
-    progressDiv.style.display = 'block';
-    countSpan.textContent = capturedPhotos.length;
-    
-    if (capturedPhotos.length < MIN_PHOTOS) {
-        statusSpan.textContent = `Khuyến nghị chụp thêm ${MIN_PHOTOS - capturedPhotos.length} ảnh nữa để đạt chất lượng tốt nhất.`;
-        statusSpan.style.color = '#f57c00';
-    } else if (capturedPhotos.length < MAX_PHOTOS) {
-        statusSpan.textContent = `Đã đủ số lượng tối thiểu. Bạn có thể chụp thêm hoặc xác nhận ngay.`;
-        statusSpan.style.color = '#4caf50';
-    } else {
-        statusSpan.textContent = `Đã chụp đủ ${MAX_PHOTOS} ảnh. Bạn có thể xác nhận ngay.`;
-        statusSpan.style.color = '#4caf50';
-    }
-}
-
-// Confirm and register face embeddings from captured photos
-async function confirmPhotosRegister() {
-    if (capturedPhotos.length === 0) {
-        showMessage('Vui lòng chụp ít nhất 1 ảnh trước!', 'error');
-        return;
-    }
-    
-    const messageDiv = document.getElementById('faceUploadMessage');
-    messageDiv.style.display = 'block';
-    messageDiv.innerHTML = '<div style="padding: 12px; background: #fff3cd; color: #856404; border-radius: 8px;">Đang xử lý ảnh và tạo embeddings...</div>';
-    
-    try {
-        // Get description and primary setting
-        const description = document.getElementById('photosDescription').value;
-        const setFirstAsPrimary = document.getElementById('setFirstAsPrimary').checked;
-        
-        // Disable confirm button during processing
-        const btnConfirm = document.getElementById('btnConfirmRegister');
-        btnConfirm.disabled = true;
-        btnConfirm.textContent = 'Đang xử lý...';
-        
-        let successCount = 0;
-        let failCount = 0;
-        let firstEmbeddingId = null;
-        
-        // Register each photo as a separate embedding
-        for (let i = 0; i < capturedPhotos.length; i++) {
-            try {
-                const photo = capturedPhotos[i];
-                // Remove data URL prefix if present
-                const base64 = photo.includes(',') ? photo.split(',')[1] : photo;
-                
-                // Determine variant type based on photo index
-                let variantType = 'default';
-                if (i === 0) {
-                    variantType = 'default';
-                } else if (i === 1) {
-                    variantType = 'profile_left';
-                } else if (i === 2) {
-                    variantType = 'profile_right';
-                } else {
-                    variantType = 'other';
-                }
-                
-                // Create description for this photo
-                let photoDescription = description || `Ảnh ${i + 1}`;
-                if (description) {
-                    photoDescription = `${description} (Ảnh ${i + 1})`;
-                }
-                
-                // Call API to register face from photo
-                const response = await fetch('/api/face/register-multi', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        employee_code: employeeCode,
-                        image: base64,
-                        variant_type: variantType,
-                        description: photoDescription,
-                        set_as_primary: (setFirstAsPrimary && i === 0)
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    successCount++;
-                    if (i === 0) {
-                        firstEmbeddingId = result.embedding_id;
-                    }
-                } else {
-                    failCount++;
-                    console.error(`Failed to register photo ${i + 1}:`, result.message);
-                }
-            } catch (error) {
-                failCount++;
-                console.error(`Error processing photo ${i + 1}:`, error);
+    for (let i = 0; i < shots.length; i++) {
+        try {
+            const response = await fetch('/api/face/register-multi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    employee_code: employeeCode,
+                    image: shots[i],
+                    variant_type: variants[i],
+                    description: `Auto 3-angle - ${shotLabels[i]}`,
+                    set_as_primary: i === 0
+                })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                ok++;
+            } else {
+                fail++;
+                failedShots.push(shotLabels[i]);
             }
+        } catch (e) {
+            fail++;
+            failedShots.push(shotLabels[i]);
         }
-        
-        // Re-enable button
-        btnConfirm.disabled = false;
-        btnConfirm.textContent = '✓ Xác nhận & Tạo Embeddings';
-        
-        if (successCount > 0) {
-            showMessage(`✓ Đã tạo thành công ${successCount} embedding(s) từ ${capturedPhotos.length} ảnh!${failCount > 0 ? ` (${failCount} ảnh thất bại)` : ''}`, 'success');
-            // Stop camera
-            stopCamera();
-            // Clear captured photos
-            capturedPhotos = [];
-            updateCapturedPhotosUI();
-            updateCaptureProgress();
-            // Reload embeddings list
-            setTimeout(() => {
-                loadEmbeddings();
-            }, 1000);
+    }
+
+    btnUploadShots.disabled = false;
+    if (ok > 0) {
+        if (fail > 0) {
+            showFaceMessage(`Lưu xong: ${ok} ảnh thành công, ${fail} ảnh lỗi. Ảnh lỗi: ${failedShots.join(', ')}. Vui lòng chụp lại ảnh lỗi.`, 'warning');
         } else {
-            showMessage(`✗ Không thể tạo embedding từ bất kỳ ảnh nào. Vui lòng thử lại.`, 'error');
+            showFaceMessage(`Lưu xong: ${ok} ảnh thành công.`, 'success');
         }
-    } catch (error) {
-        console.error('Error uploading photos:', error);
-        showMessage('✗ Có lỗi xảy ra khi xử lý ảnh: ' + error.message, 'error');
-        
-        // Re-enable button
-        const btnConfirm = document.getElementById('btnConfirmRegister');
-        btnConfirm.disabled = false;
-        btnConfirm.textContent = '✓ Xác nhận & Tạo Embeddings';
-    }
-}
-
-
-function showMessage(message, type) {
-    const messageDiv = document.getElementById('faceUploadMessage');
-    let bgColor, textColor, borderColor;
-    
-    if (type === 'success') {
-        bgColor = '#e8f5e9';
-        textColor = '#4caf50';
-        borderColor = '#4caf50';
-    } else if (type === 'info') {
-        bgColor = '#e3f2fd';
-        textColor = '#2196f3';
-        borderColor = '#2196f3';
     } else {
-        bgColor = '#ffebee';
-        textColor = '#f44336';
-        borderColor = '#f44336';
+        showFaceMessage('Không lưu được ảnh nào. Hãy chụp lại với ánh sáng tốt hơn.', 'error');
     }
-    
-    messageDiv.innerHTML = `<div style="padding: 12px; background: ${bgColor}; color: ${textColor}; border-radius: 8px; border-left: 4px solid ${borderColor};">${message}</div>`;
-    messageDiv.style.display = 'block';
 }
+
+btnStartCam.addEventListener('click', startCam);
+btnStopCam.addEventListener('click', stopCam);
+btnCapture.addEventListener('click', captureShot);
+btnResetShots.addEventListener('click', () => {
+    shots = [];
+    refreshShotUI();
+    showFaceMessage('Đã xóa ảnh đã chụp.', 'info');
+});
+btnUploadShots.addEventListener('click', uploadShots);
+
+window.addEventListener('beforeunload', stopCam);
+refreshShotUI();
 </script>
 {% endif %}
+
 {% endblock %}
 

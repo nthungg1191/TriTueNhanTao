@@ -5,6 +5,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from sqlalchemy import inspect, text
 from config.config import config
 import logging
 from logging.handlers import RotatingFileHandler
@@ -27,6 +28,9 @@ def create_app(config_name='development'):
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
+
+    # Backfill attendance columns when the table already exists in an older schema.
+    ensure_attendance_punch_columns(app)
     
     # Configure login manager
     login_manager.login_view = 'auth.login'
@@ -93,7 +97,7 @@ def create_directories(app):
 def register_blueprints(app):
     """Register Flask blueprints"""
     # Import blueprints here to avoid circular imports
-    from app.routes import auth, admin, kiosk, api, face_api, demo, notifications
+    from app.routes import auth, admin, kiosk, api, face_api, demo, notifications, employee, face_register
     
     app.register_blueprint(auth.bp)
     app.register_blueprint(admin.bp)
@@ -102,6 +106,8 @@ def register_blueprints(app):
     app.register_blueprint(face_api.face_api)
     app.register_blueprint(demo.bp)
     app.register_blueprint(notifications.bp)
+    app.register_blueprint(employee.bp)
+    app.register_blueprint(face_register.bp)
 
 
 def register_error_handlers(app):
@@ -120,4 +126,28 @@ def register_error_handlers(app):
     @app.errorhandler(403)
     def forbidden_error(error):
         return render_template('errors/403.html'), 403
+
+
+def ensure_attendance_punch_columns(app):
+    """Add missing punch columns to the attendance table for older databases."""
+    try:
+        with app.app_context():
+            inspector = inspect(db.engine)
+            if 'attendance' not in inspector.get_table_names():
+                return
+
+            existing_columns = {column['name'] for column in inspector.get_columns('attendance')}
+            column_sql = {
+                'check_in_time_2': 'DATETIME NULL',
+                'check_out_time_2': 'DATETIME NULL',
+                'check_in_photo_2': 'VARCHAR(255) NULL',
+                'check_out_photo_2': 'VARCHAR(255) NULL',
+            }
+
+            with db.engine.begin() as connection:
+                for column_name, ddl in column_sql.items():
+                    if column_name not in existing_columns:
+                        connection.execute(text(f'ALTER TABLE attendance ADD COLUMN {column_name} {ddl}'))
+    except Exception as exc:
+        app.logger.warning(f'Could not ensure attendance punch columns: {exc}')
 

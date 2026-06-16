@@ -1,0 +1,221 @@
+{% extends "layouts/admin_base.html" %}
+
+{% block title %}Đăng Ký Khuôn Mặt - {{ employee.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <a href="{{ url_for('face_register.index') }}" class="btn btn-outline-secondary mb-3">
+                <i class="fas fa-arrow-left"></i> Quay Lại
+            </a>
+            
+            <div class="card border-0 shadow-sm bg-gradient" style="background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);">
+                <div class="card-body text-white p-4">
+                    <h2 class="mb-2">
+                        <i class="fas fa-face-smile"></i> Đăng Ký Khuôn Mặt
+                    </h2>
+                    <p class="mb-0 text-white-80">{{ employee.name }} ({{ employee.employee_code }})</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Camera Capture Section -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-light border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-video"></i> Chụp Từ Camera
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="bg-dark text-center position-relative" style="height: 300px; overflow: hidden; border-radius: 8px;">
+                                <video id="cameraFeed" width="100%" height="300" autoplay muted playsinline style="display: block; object-fit: cover;"></video>
+                                <canvas id="captureCanvas" style="display: none;"></canvas>
+                                <div id="loadingSpinner" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;">
+                                    <div class="spinner-border text-light" role="status">
+                                        <span class="visually-hidden">Đang xử lý...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-primary w-100" id="btnCapture">
+                                    <i class="fas fa-camera"></i> Chụp Ảnh
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bg-light text-center position-relative" style="height: 300px; border-radius: 8px; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center;">
+                                <img id="capturedImage" style="max-width: 100%; max-height: 100%; display: none; border-radius: 6px;">
+                                <div id="placeholderText" style="color: #999; text-align: center;">
+                                    <i class="fas fa-image" style="font-size: 3rem;"></i>
+                                    <p>Ảnh sẽ hiển thị ở đây</p>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-success w-100" id="btnUpload" style="display: none;">
+                                    <i class="fas fa-check"></i> Lưu Khuôn Mặt
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload Section -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-file-upload"></i> Hoặc Tải Ảnh Từ Máy Tính
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="imageFile" class="form-label">Chọn Ảnh</label>
+                            <input type="file" class="form-control" id="imageFile" name="image" accept="image/*" required>
+                            <small class="text-muted">Định dạng: JPG, PNG. Kích thước: tối đa 5MB</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-upload"></i> Đăng Ký Khuôn Mặt
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-light border-bottom">
+                    <h5 class="mb-0">
+                        <i class="fas fa-lightbulb"></i> Hướng Dẫn
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Khuôn mặt phải rõ ràng, không bị che khuất</li>
+                        <li>Ánh sáng phải đủ để nhìn rõ mặt</li>
+                        <li>Khoảng cách camera: 30-50cm</li>
+                        <li>Hướng mặt thẳng vào camera</li>
+                        <li>Ảnh chỉ chứa 1 người</li>
+                        <li>Chất lượng ảnh: độ nét cao</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .text-white-80 {
+        color: rgba(255, 255, 255, 0.8);
+    }
+</style>
+
+<script>
+    const cameraFeed = document.getElementById('cameraFeed');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const capturedImage = document.getElementById('capturedImage');
+    const placeholderText = document.getElementById('placeholderText');
+    const btnCapture = document.getElementById('btnCapture');
+    const btnUpload = document.getElementById('btnUpload');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const uploadForm = document.getElementById('uploadForm');
+    const imageFile = document.getElementById('imageFile');
+
+    let mediaStream = null;
+    let capturedImageData = null;
+
+    // Initialize camera
+    async function initCamera() {
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' },
+                audio: false
+            });
+            cameraFeed.srcObject = mediaStream;
+        } catch (error) {
+            alert('Không thể mở camera: ' + error.message);
+        }
+    }
+
+    // Capture image
+    btnCapture.addEventListener('click', () => {
+        const targetWidth = 640;
+        const targetHeight = 480;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        canvas.getContext('2d').drawImage(cameraFeed, 0, 0, targetWidth, targetHeight);
+
+        capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+        capturedImage.src = capturedImageData;
+        capturedImage.style.display = 'block';
+        placeholderText.style.display = 'none';
+        btnUpload.style.display = 'block';
+    });
+
+    // Upload captured image
+    btnUpload.addEventListener('click', async () => {
+        if (!capturedImageData) return;
+
+        loadingSpinner.style.display = 'flex';
+
+        try {
+            const response = await fetch('{{ url_for("face_register.upload_face_base64", employee_id=employee.id) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: capturedImageData })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert('✓ ' + result.message);
+                window.location.href = '{{ url_for("face_register.index") }}';
+            } else {
+                alert('❌ ' + result.message);
+            }
+        } catch (error) {
+            alert('Lỗi: ' + error.message);
+        } finally {
+            loadingSpinner.style.display = 'none';
+        }
+    });
+
+    // File upload form
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        formData.append('image', imageFile.files[0]);
+
+        loadingSpinner.style.display = 'flex';
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            });
+
+            // Form submit sẽ redirect, không cần xử lý response
+        } catch (error) {
+            alert('Lỗi: ' + error.message);
+            loadingSpinner.style.display = 'none';
+        }
+    });
+
+    // Initialize camera on page load
+    window.addEventListener('load', initCamera);
+
+    // Stop camera on page unload
+    window.addEventListener('beforeunload', () => {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+        }
+    });
+</script>
+{% endblock %}
