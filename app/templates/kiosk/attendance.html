@@ -48,7 +48,7 @@
         <div class="row">
             <div>
                 <video id="video" autoplay playsinline muted></video>
-                <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
+                <canvas id="canvas" width="640" height="480" style="display:none"></canvas>
             </div>
             <div class="side">
                 <div class="controls">
@@ -82,7 +82,7 @@ const statusEl = qs('#status');
 
 async function startCamera() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
         video.srcObject = stream;
         statusEl.textContent = '📷 Camera đã bật.';
         startAutoRecognition();
@@ -102,11 +102,13 @@ function stopCamera() {
 
 function captureDataURL() {
     const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     ctx.save();
     ctx.scale(-1, 1);
     ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
     ctx.restore();
-    return canvas.toDataURL('image/jpeg', 0.7);
+    return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 const AUTO_RECOGNITION_INTERVAL_MS = 900;
