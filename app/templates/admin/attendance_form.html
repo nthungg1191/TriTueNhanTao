@@ -41,7 +41,7 @@
                    name="check_in_time" 
                    id="check_in_time" 
                    class="form-control"
-                   value="{% if attendance and attendance.check_in_time %}{{ attendance.check_in_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.check_in_time | time_input if attendance and attendance.check_in_time else '' }}">
             <small class="form-text text-muted">Để trống nếu nhân viên vắng mặt</small>
         </div>
 
@@ -51,7 +51,7 @@
                    name="check_out_time" 
                    id="check_out_time" 
                    class="form-control"
-                   value="{% if attendance and attendance.check_out_time %}{{ attendance.check_out_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.check_out_time | time_input if attendance and attendance.check_out_time else '' }}">
             <small class="form-text text-muted">Để trống nếu chưa check-out</small>
         </div>
     </div>
@@ -63,7 +63,7 @@
                    name="check_in_time_2" 
                    id="check_in_time_2" 
                    class="form-control"
-                   value="{% if attendance and attendance.check_in_time_2 %}{{ attendance.check_in_time_2.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.check_in_time_2 | time_input if attendance and attendance.check_in_time_2 else '' }}">
             <small class="form-text text-muted">Giờ quay lại làm việc sau nghỉ trưa</small>
         </div>
 
@@ -73,7 +73,7 @@
                    name="check_out_time_2" 
                    id="check_out_time_2" 
                    class="form-control"
-                   value="{% if attendance and attendance.check_out_time_2 %}{{ attendance.check_out_time_2.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.check_out_time_2 | time_input if attendance and attendance.check_out_time_2 else '' }}">
             <small class="form-text text-muted">Giờ kết thúc ngày làm việc</small>
         </div>
     </div>
@@ -85,7 +85,7 @@
                    name="overtime_check_in_time"
                    id="overtime_check_in_time"
                    class="form-control"
-                   value="{% if attendance and attendance.overtime_check_in_time %}{{ attendance.overtime_check_in_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.overtime_check_in_time | time_input if attendance and attendance.overtime_check_in_time else '' }}">
             <small class="form-text text-muted">Dùng khi có phiên OT (17:30+)</small>
         </div>
 
@@ -95,7 +95,7 @@
                    name="overtime_check_out_time"
                    id="overtime_check_out_time"
                    class="form-control"
-                   value="{% if attendance and attendance.overtime_check_out_time %}{{ attendance.overtime_check_out_time.strftime('%Y-%m-%dT%H:%M') }}{% endif %}">
+                   value="{{ attendance.overtime_check_out_time | time_input if attendance and attendance.overtime_check_out_time else '' }}">
             <small class="form-text text-muted">Dùng khi có phiên OT (kết thúc OT)</small>
         </div>
     </div>

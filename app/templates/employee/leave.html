@@ -27,32 +27,34 @@
 </div>
 
 <div class="table-card">
-    <table class="table">
-        <thead>
-            <tr><th>Bắt đầu</th><th>Kết thúc</th><th>Trạng thái</th><th>Lý do</th><th>Hành động</th></tr>
-        </thead>
-        <tbody>
-        {% for r in requests %}
-            <tr>
-                <td>{{ r.start_date }}</td>
-                <td>{{ r.end_date }}</td>
-                <td><span class="request-status {{ r.status_badge_class }}">{{ r.status_label }}</span></td>
-                <td>{{ r.reason }}</td>
-                <td>
-                    {% if r.status == 'pending' and not r.is_overdue %}
-                    <form method="post" action="{{ url_for('employee.withdraw_leave', request_id=r.id) }}" style="display:inline;">
-                        <button type="button" class="btn btn-secondary" data-confirm-message="Bạn có chắc muốn thu hồi yêu cầu xin nghỉ từ {{ r.start_date }} đến {{ r.end_date }}?" onclick="openConfirmModal(this)">Thu hồi</button>
-                    </form>
-                    {% else %}
-                    <span style="color:#94a3b8;">-</span>
-                    {% endif %}
-                </td>
-            </tr>
-        {% else %}
-            <tr><td colspan="5">Chưa có yêu cầu nào.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table responsive-cards">
+            <thead>
+                <tr><th>Bắt đầu</th><th>Kết thúc</th><th>Trạng thái</th><th>Lý do</th><th>Hành động</th></tr>
+            </thead>
+            <tbody>
+            {% for r in requests %}
+                <tr>
+                    <td>{{ r.start_date }}</td>
+                    <td>{{ r.end_date }}</td>
+                    <td><span class="request-status {{ r.status_badge_class }}">{{ r.status_label }}</span></td>
+                    <td>{{ r.reason }}</td>
+                    <td>
+                        {% if r.status == 'pending' %}
+                        <form method="post" action="{{ url_for('employee.withdraw_leave', request_id=r.id) }}" style="display:inline;">
+                            <button type="button" class="btn btn-secondary" data-confirm-message="Bạn có chắc muốn thu hồi yêu cầu xin nghỉ từ {{ r.start_date }} đến {{ r.end_date }}?" onclick="openConfirmModal(this)">Thu hồi</button>
+                        </form>
+                        {% else %}
+                        <span style="color:#94a3b8;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">Chưa có yêu cầu nào.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <script>

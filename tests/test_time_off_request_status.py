@@ -10,12 +10,11 @@ def test_overtime_request_status_helpers():
     assert req.status_badge_class == 'status-withdrawn'
 
 
-def test_overtime_request_overdue_status_helpers():
-    req = OvertimeRequest(status='pending', date=date.today() - timedelta(days=1))
+def test_overtime_request_cancelled_status_helpers():
+    req = OvertimeRequest(status='cancelled', date=date.today() - timedelta(days=1))
 
-    assert req.is_overdue
-    assert req.status_label == 'Yêu cầu quá hạn'
-    assert req.status_badge_class == 'status-overdue'
+    assert req.status_label == 'Đã quá hạn'
+    assert req.status_badge_class == 'status-cancelled'
 
 
 def test_leave_request_status_helpers():
@@ -25,9 +24,8 @@ def test_leave_request_status_helpers():
     assert req.status_badge_class == 'status-pending'
 
 
-def test_leave_request_overdue_status_helpers():
-    req = LeaveRequest(status='pending', end_date=date.today() - timedelta(days=1))
+def test_leave_request_cancelled_status_helpers():
+    req = LeaveRequest(status='cancelled', end_date=date.today() - timedelta(days=1))
 
-    assert req.is_overdue
-    assert req.status_label == 'Yêu cầu quá hạn'
-    assert req.status_badge_class == 'status-overdue'
+    assert req.status_label == 'Đã quá hạn'
+    assert req.status_badge_class == 'status-cancelled'

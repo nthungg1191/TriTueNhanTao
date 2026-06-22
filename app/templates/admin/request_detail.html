@@ -64,7 +64,7 @@
     .status-approved { background:#ecfdf5; color:#166534; }
     .status-rejected { background:#fee2e2; color:#991b1b; }
     .status-withdrawn { background:#e2e8f0; color:#475569; }
-    .status-overdue { background:#fff7ed; color:#c2410c; }
+    .status-cancelled { background:#fff1f2; color:#9f1239; }
 </style>
 
 <div class="request-detail-card">
@@ -116,7 +116,7 @@
         </tbody>
     </table>
 
-    {% if request.status == 'pending' and not request.is_overdue %}
+    {% if request.status == 'pending' %}
     <div class="request-detail-actions">
         <form method="post" action="{{ url_for('admin.approve_'+kind, request_id=request.id) }}">
             <button class="btn btn-primary">Duyệt</button>
@@ -127,10 +127,6 @@
             <textarea name="admin_note" rows="3"></textarea>
             <button class="btn" style="background:#b91c1c;color:white; margin-top:12px;">Từ chối</button>
         </form>
-    </div>
-    {% elif request.is_overdue %}
-    <div style="padding:14px 16px; background:#fff7ed; color:#c2410c; border-radius:12px; font-weight:600;">
-        Yêu cầu này đã quá hạn nên không thể duyệt hoặc từ chối.
     </div>
     {% endif %}
 </div>

@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        libopenblas-dev \
+        liblapack-dev \
+        libatlas3-base \
+        libx11-dev \
+        libgtk-3-dev \
+        libsm6 \
+        libxrender1 \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
+
+COPY . ./
+
+EXPOSE 5555
+CMD ["python", "run.py"]

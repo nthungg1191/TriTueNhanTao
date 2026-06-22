@@ -328,9 +328,7 @@
     <div class="page-header">
         <h1>📅 Quản lý chấm công</h1>
         <div class="page-actions">
-            <a href="{{ url_for('admin.attendance_new') }}" class="btn btn-primary">
-                ➕ Thêm chấm công
-            </a>
+            
         </div>
     </div>
 
@@ -387,7 +385,7 @@
     <div class="table-view">
         <div class="table-container">
             {% if records %}
-            <table class="table">
+            <table class="table responsive-cards">
                 <thead>
                     <tr>
                         <th>Mã NV</th>
@@ -412,21 +410,21 @@
                             <div class="photo-cell">
                                 <div class="time-display">
                                     {% if record.check_in_time %}
-                                        {{ record.check_in_time.strftime('%H:%M:%S') }}
+                                        {{ record.get_check_in_local() }}
                                     {% else %}
                                         <span style="color: #ccc;">--:--:--</span>
                                     {% endif %}
                                 </div>
                                 {% if record.check_in_time_2 %}
                                     <div class="time-display" style="margin-top: 6px;">
-                                        {{ record.check_in_time_2.strftime('%H:%M:%S') }}
+                                        {{ record.get_check_in_2_local() }}
                                     </div>
                                 {% endif %}
                                 {% if record.check_in_photo %}
                                     <img src="{{ record.check_in_photo }}" 
                                          alt="Check-in photo" 
                                          class="photo-thumbnail"
-                                         onclick="showPhotoModal('{{ record.check_in_photo }}', 'Check-in: {{ record.check_in_time.strftime('%H:%M:%S') if record.check_in_time else 'N/A' }}')"
+                                         onclick="showPhotoModal('{{ record.check_in_photo }}', 'Check-in: {{ record.get_check_in_local() }}')"
                                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                     <div class="photo-placeholder" style="display: none;">Ảnh lỗi</div>
                                 {% else %}
@@ -438,21 +436,21 @@
                             <div class="photo-cell">
                                 <div class="time-display">
                                     {% if record.check_out_time %}
-                                        {{ record.check_out_time.strftime('%H:%M:%S') }}
+                                        {{ record.get_check_out_local() }}
                                     {% else %}
                                         <span style="color: #ccc;">--:--:--</span>
                                     {% endif %}
                                 </div>
                                 {% if record.check_out_time_2 %}
                                     <div class="time-display" style="margin-top: 6px;">
-                                        {{ record.check_out_time_2.strftime('%H:%M:%S') }}
+                                        {{ record.get_check_out_2_local() }}
                                     </div>
                                 {% endif %}
                                 {% if record.check_out_photo %}
                                     <img src="{{ record.check_out_photo }}" 
                                          alt="Check-out photo" 
                                          class="photo-thumbnail"
-                                         onclick="showPhotoModal('{{ record.check_out_photo }}', 'Check-out: {{ record.check_out_time.strftime('%H:%M:%S') if record.check_out_time else 'N/A' }}')"
+                                         onclick="showPhotoModal('{{ record.check_out_photo }}', 'Check-out: {{ record.get_check_out_local() }}')"
                                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                     <div class="photo-placeholder" style="display: none;">Ảnh lỗi</div>
                                 {% else %}
@@ -463,14 +461,14 @@
                         <td>
                             <div class="time-display">
                                 {% if record.overtime_check_in_time %}
-                                    {{ record.overtime_check_in_time.strftime('%H:%M:%S') }}
+                                    {{ record.get_ot_check_in_local() }}
                                 {% else %}
                                     <span style="color: #ccc;">--:--:--</span>
                                 {% endif %}
                             </div>
                             <div class="time-display" style="margin-top:6px;">
                                 {% if record.overtime_check_out_time %}
-                                    {{ record.overtime_check_out_time.strftime('%H:%M:%S') }}
+                                    {{ record.get_ot_check_out_local() }}
                                 {% endif %}
                             </div>
                         </td>

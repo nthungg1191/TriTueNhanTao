@@ -377,7 +377,25 @@ def register_face_multi():
             }), 400
         
         face_encoding = result_detect['face_encodings'][0]
-        
+
+        # --- Duplicate face check ---
+        try:
+            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+            if recognition.get('success') and recognition.get('employee_code'):
+                matched_code = recognition['employee_code']
+                if matched_code != employee_code:
+                    matched_name = recognition.get('employee_name', matched_code)
+                    return jsonify({
+                        'success': False,
+                        'message': (
+                            f'Khuôn mặt này đã thuộc về nhân viên '
+                            f'"{matched_name}" ({matched_code}). '
+                            f'Không thể đăng ký cho nhân viên khác.'
+                        )
+                    }), 409
+        except Exception:
+            pass  # If recognition check fails, proceed with registration
+
         result = face_service.add_face_embedding(
             employee_code=employee_code,
             embedding=face_encoding,
