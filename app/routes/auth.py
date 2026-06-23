@@ -67,7 +67,7 @@ def employee_login():
         user = User.query.filter_by(username=username).first()
 
         if not user:
-            flash('Tài khoản không tồn tại.', 'warning')
+            flash('Tài khoản chưa được tạo. Vui lòng liên hệ quản trị viên để được cấp tài khoản.', 'warning')
             return render_template('auth/employee_login.html')
 
         if user.check_password(password):

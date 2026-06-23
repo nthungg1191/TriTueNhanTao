@@ -2,6 +2,7 @@
 from app import db
 from datetime import datetime, timezone, time as dt_time
 from math import ceil
+from app.utils.timezone_utils import get_local_now, to_local, format_time_24h
 
 
 class Attendance(db.Model):
@@ -26,8 +27,8 @@ class Attendance(db.Model):
     check_out_photo = db.Column(db.String(255), nullable=True)
     check_in_photo_2 = db.Column(db.String(255), nullable=True)
     check_out_photo_2 = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=get_local_now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_local_now, onupdate=get_local_now)
     
     # Composite index for faster queries
     __table_args__ = (
@@ -73,11 +74,29 @@ class Attendance(db.Model):
     def __repr__(self):
         return f'<Attendance {self.employee_id} on {self.date}>'
     
-    def check_in(self, timestamp=None):
-        """Record check-in time"""
+    def check_in(self, timestamp=None, slot=None):
+        """Record check-in time.
+
+        Args:
+            timestamp: Optional explicit datetime to record. Defaults to now.
+            slot: Optional explicit target slot. ``1`` writes to
+                ``check_in_time``; ``2`` writes to ``check_in_time_2`` (used
+                when an employee skipped the morning check-in and scans during
+                the lunch window).
+        """
         if timestamp is None:
             timestamp = datetime.now()
-        if self.check_in_time is None:
+        if slot == 1:
+            if self.check_in_time is not None:
+                raise ValueError('check_in_time already filled')
+            self.check_in_time = timestamp
+            punch_slot = 1
+        elif slot == 2:
+            if self.check_in_time_2 is not None:
+                raise ValueError('check_in_time_2 already filled')
+            self.check_in_time_2 = timestamp
+            punch_slot = 2
+        elif self.check_in_time is None:
             self.check_in_time = timestamp
             punch_slot = 1
         elif self.check_out_time is not None and self.check_in_time_2 is None:
@@ -89,11 +108,28 @@ class Attendance(db.Model):
         self.update_status()
         return punch_slot
     
-    def check_out(self, timestamp=None):
-        """Record check-out time"""
+    def check_out(self, timestamp=None, slot=None):
+        """Record check-out time.
+
+        Args:
+            timestamp: Optional explicit datetime to record. Defaults to now.
+            slot: Optional explicit target slot. ``1`` writes to
+                ``check_out_time``; ``2`` writes to ``check_out_time_2`` (used
+                when an employee scans during the afternoon window).
+        """
         if timestamp is None:
             timestamp = datetime.now()
-        if self.check_in_time is not None and self.check_out_time is None:
+        if slot == 1:
+            if self.check_out_time is not None:
+                raise ValueError('check_out_time already filled')
+            self.check_out_time = timestamp
+            punch_slot = 1
+        elif slot == 2:
+            if self.check_out_time_2 is not None:
+                raise ValueError('check_out_time_2 already filled')
+            self.check_out_time_2 = timestamp
+            punch_slot = 2
+        elif self.check_in_time is not None and self.check_out_time is None:
             self.check_out_time = timestamp
             punch_slot = 1
         elif self.check_in_time_2 is not None and self.check_out_time_2 is None:
@@ -272,7 +308,27 @@ class Attendance(db.Model):
             # 1 hour or more: show hours with 2 decimals
             hours = round(seconds / 3600, 2)
             return f"{hours}h"
-    
+
+    # --- Timezone-aware display helpers (24h format) ---
+
+    def get_check_in_local(self):
+        return format_time_24h(self.check_in_time)
+
+    def get_check_out_local(self):
+        return format_time_24h(self.check_out_time)
+
+    def get_check_in_2_local(self):
+        return format_time_24h(self.check_in_time_2)
+
+    def get_check_out_2_local(self):
+        return format_time_24h(self.check_out_time_2)
+
+    def get_ot_check_in_local(self):
+        return format_time_24h(self.overtime_check_in_time)
+
+    def get_ot_check_out_local(self):
+        return format_time_24h(self.overtime_check_out_time)
+
     def update_status(self):
         """Update attendance status based on check-in/out times"""
         # Standardized rules for day shift 08:00-17:00 with lunch break 12:00-13:00.
@@ -438,6 +494,13 @@ class Attendance(db.Model):
             'check_out_time_2': self.check_out_time_2.isoformat() if self.check_out_time_2 else None,
             'overtime_check_in_time': self.overtime_check_in_time.isoformat() if self.overtime_check_in_time else None,
             'overtime_check_out_time': self.overtime_check_out_time.isoformat() if self.overtime_check_out_time else None,
+            # Timezone-local 24h display strings
+            'check_in_time_local': self.get_check_in_local(),
+            'check_out_time_local': self.get_check_out_local(),
+            'check_in_time_2_local': self.get_check_in_2_local(),
+            'check_out_time_2_local': self.get_check_out_2_local(),
+            'overtime_check_in_time_local': self.get_ot_check_in_local(),
+            'overtime_check_out_time_local': self.get_ot_check_out_local(),
             'check_in_photo': self.check_in_photo,
             'check_out_photo': self.check_out_photo,
             'check_in_photo_2': self.check_in_photo_2,

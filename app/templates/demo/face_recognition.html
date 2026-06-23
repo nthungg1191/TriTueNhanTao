@@ -90,6 +90,7 @@
             width: 100%;
             height: auto;
             display: block;
+            transform: scaleX(-1);
         }
         
         canvas {
@@ -394,6 +395,7 @@
                     audio: false
                 });
                 video.srcObject = stream;
+                await video.play();
                 showStatus('Camera đã được bật thành công', 'success');
                 startGuidance('Camera đã bật. Hãy giữ khuôn mặt trong khung và nhìn thẳng.');
                 btnStart.disabled = true;
@@ -433,10 +435,25 @@
         // Capture image from video
         function captureImage() {
             const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
             return canvas.toDataURL('image/jpeg', 0.9);
+        }
+
+        function isNoFaceMessage(message) {
+            const normalized = (message || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+
+            return normalized.includes('no face') ||
+                normalized.includes('face could not be detected') ||
+                normalized.includes('khong co khuon mat') ||
+                normalized.includes('khong tim thay khuon mat');
         }
         
         // Recognize face
@@ -461,7 +478,7 @@
                 
                 if (!response.ok || !data.success) {
                     const message = data.message || 'Không tìm thấy khuôn mặt';
-                    if (message.toLowerCase().includes('face could not be detected') || message.toLowerCase().includes('không tìm thấy khuôn mặt')) {
+                    if (isNoFaceMessage(message)) {
                         updateGuidance('Chưa thấy rõ khuôn mặt. Hãy đưa mặt gần hơn và nhìn thẳng vào camera.');
                     } else {
                         updateGuidance('Có lỗi khi nhận diện. Thử lại sau vài giây.');

@@ -6,11 +6,13 @@ from .system_log import SystemLog
 from .work_schedule import WorkSchedule
 from .department import Department
 from .face_embedding import FaceEmbedding
+from .time_off import OvertimeRequest, LeaveRequest, AttendanceCorrectionRequest
 from .permission import Permission, Role, RolePermission, UserRole, Permissions
 
 __all__ = [
     'User', 'Employee', 'Attendance', 'SystemLog', 'WorkSchedule', 
     'Department', 'FaceEmbedding',
+    'OvertimeRequest', 'LeaveRequest', 'AttendanceCorrectionRequest',
     'Permission', 'Role', 'RolePermission', 'UserRole', 'Permissions'
 ]
 

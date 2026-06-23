@@ -1,9 +1,12 @@
 
 import base64
+import binascii
 import io
 import logging
+import time
+import uuid
 from typing import Optional
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 try:
     from app.services.face_detection import FaceDetector
     from app.services.face_service import FaceService
@@ -31,63 +34,127 @@ face_api = Blueprint('face_api', __name__, url_prefix='/api/face')
 
 @face_api.route('/recognize', methods=['POST'])
 def recognize_face():
-    logger.info(f"[FACE_RECOGNIZE] Request received")
+    request_id = uuid.uuid4().hex[:8]
+    route_logger = current_app.logger
+    start_time = time.perf_counter()
+    route_logger.info(
+        "[FACE_RECOGNIZE:%s] Request received: remote_addr=%s content_type=%s content_length=%s user_agent=%s",
+        request_id,
+        request.remote_addr,
+        request.content_type,
+        request.content_length,
+        request.user_agent.string,
+    )
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         
         if not data:
-            logger.warning("[FACE_RECOGNIZE] No data provided")
+            raw_preview = request.get_data(cache=False, as_text=True)[:120]
+            route_logger.warning(
+                "[FACE_RECOGNIZE:%s] Returning 400: no/invalid JSON body. raw_preview=%r",
+                request_id,
+                raw_preview,
+            )
             return jsonify({
                 'success': False,
                 'message': 'Không có dữ liệu'
             }), 400
         
+        if not isinstance(data, dict):
+            route_logger.warning(
+                "[FACE_RECOGNIZE:%s] Returning 400: JSON body must be an object. type=%s",
+                request_id,
+                type(data).__name__,
+            )
+            return jsonify({
+                'success': False,
+                'message': 'Không có dữ liệu'
+            }), 400
+
+        route_logger.info("[FACE_RECOGNIZE:%s] JSON parsed: keys=%s", request_id, sorted(data.keys()))
+
         image_data = data.get('image')
         
         if not image_data:
-            logger.warning("[FACE_RECOGNIZE] No image data")
+            route_logger.warning(
+                "[FACE_RECOGNIZE:%s] Returning 400: missing image field. keys=%s",
+                request_id,
+                sorted(data.keys()),
+            )
             return jsonify({
                 'success': False,
                 'message': 'Dữ liệu ảnh là bắt buộc'
             }), 400
         
-        logger.info(f"[FACE_RECOGNIZE] Image data length: {len(image_data)}")
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Image payload: %s",
+            request_id,
+            _describe_image_payload(image_data),
+        )
         
         # Decode image
-        image = _decode_image(image_data)
+        image = _decode_image(image_data, request_id=request_id)
         if image is None:
-            logger.warning("[FACE_RECOGNIZE] Failed to decode image")
+            route_logger.warning("[FACE_RECOGNIZE:%s] Returning 400: failed to decode image payload", request_id)
             return jsonify({
                 'success': False,
                 'message': 'Dữ liệu ảnh không hợp lệ'
             }), 400
         
-        logger.info(f"[FACE_RECOGNIZE] Image decoded: shape={image.shape if image is not None else 'None'}")
+        route_logger.info("[FACE_RECOGNIZE:%s] Image decoded: %s", request_id, _describe_decoded_image(image))
         
         # Check service availability
         if face_detector is None:
-            logger.error("[FACE_RECOGNIZE] face_detector is None - face_recognition module not loaded")
+            route_logger.error("[FACE_RECOGNIZE:%s] face_detector is None - face_recognition module not loaded", request_id)
             return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
 
         # Process image for face detection
-        logger.info("[FACE_RECOGNIZE] Calling face_detector.process_image()")
-        result = face_detector.process_image(image)
-        logger.info(f"[FACE_RECOGNIZE] Detection result: faces_found={result.get('faces_found')}")
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Calling face detection pipeline: model=%s tolerance=%s upsample=%s",
+            request_id,
+            getattr(face_detector, 'model', None),
+            getattr(face_detector, 'tolerance', None),
+            getattr(face_detector, 'upsample', None),
+        )
+        result = _process_image_for_recognition(image, request_id)
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Detection result: attempt=%s faces_found=%s locations=%s encodings=%s names=%s error=%s",
+            request_id,
+            result.get('detection_attempt'),
+            result.get('faces_found'),
+            result.get('face_locations'),
+            len(result.get('face_encodings') or []),
+            result.get('names'),
+            result.get('error'),
+        )
         
         if result.get('error'):
-            logger.error(f"[FACE_RECOGNIZE] Detection error: {result.get('error')}")
+            route_logger.error("[FACE_RECOGNIZE:%s] Detection error: %s", request_id, result.get('error'))
             return jsonify({
                 'success': False,
                 'message': f"Lỗi phát hiện khuôn mặt: {result.get('error')}"
             }), 500
         
         if result['faces_found'] == 0:
+            route_logger.warning(
+                "[FACE_RECOGNIZE:%s] Returning 400: no face detected after fallback. last_attempt=%s image=%s",
+                request_id,
+                result.get('detection_attempt'),
+                _describe_decoded_image(image),
+            )
             return jsonify({
                 'success': False,
                 'message': 'Không có khuôn mặt trong ảnh'
             }), 400
         
         if result['faces_found'] > 1:
+            route_logger.warning(
+                "[FACE_RECOGNIZE:%s] Returning 400: multiple faces detected. attempt=%s faces_found=%s locations=%s",
+                request_id,
+                result.get('detection_attempt'),
+                result['faces_found'],
+                result.get('face_locations'),
+            )
             return jsonify({
                 'success': False,
                 'message': 'Nhiều khuôn mặt được phát hiện. Vui lòng sử dụng ảnh với một khuôn mặt'
@@ -95,13 +162,19 @@ def recognize_face():
         
         # Get face encoding
         face_encoding = result['face_encodings'][0]
-        logger.info(f"[FACE_RECOGNIZE] Got face encoding: shape={face_encoding.shape}")
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Got face encoding: shape=%s dtype=%s norm=%.6f",
+            request_id,
+            getattr(face_encoding, 'shape', None),
+            getattr(face_encoding, 'dtype', None),
+            float(np.linalg.norm(face_encoding)),
+        )
         
         # Recognize employee using multi-embedding system
         face_service = FaceService(db.session)
-        logger.info("[FACE_RECOGNIZE] Calling face_service.recognize_employee_multi()")
+        route_logger.info("[FACE_RECOGNIZE:%s] Calling face_service.recognize_employee_multi()", request_id)
         recognition_result = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
-        logger.info(f"[FACE_RECOGNIZE] Recognition result: {recognition_result}")
+        route_logger.info("[FACE_RECOGNIZE:%s] Recognition result: %s", request_id, recognition_result)
 
         if recognition_result.get('success') and recognition_result.get('employee_code'):
             employee = Employee.query.filter_by(employee_code=recognition_result['employee_code']).first()
@@ -115,12 +188,21 @@ def recognize_face():
             ]:
                 recognition_result['message'] = 'Nhân viên chưa có mặt trong hệ thống. Vui lòng liên hệ quản trị viên.'
 
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Completed: success=%s employee_code=%s elapsed_ms=%.1f",
+            request_id,
+            recognition_result.get('success'),
+            recognition_result.get('employee_code'),
+            (time.perf_counter() - start_time) * 1000,
+        )
         return jsonify(recognition_result), 200
 
     except Exception as e:
-        import traceback
-        logger.error(f"[FACE_RECOGNIZE] EXCEPTION: {str(e)}")
-        logger.error(f"[FACE_RECOGNIZE] Traceback: {traceback.format_exc()}")
+        route_logger.exception(
+            "[FACE_RECOGNIZE:%s] Unhandled exception after %.1fms",
+            request_id,
+            (time.perf_counter() - start_time) * 1000,
+        )
         return jsonify({
             'success': False,
             'message': f'Nhận dạng thất bại: {str(e)}'
@@ -295,7 +377,25 @@ def register_face_multi():
             }), 400
         
         face_encoding = result_detect['face_encodings'][0]
-        
+
+        # --- Duplicate face check ---
+        try:
+            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+            if recognition.get('success') and recognition.get('employee_code'):
+                matched_code = recognition['employee_code']
+                if matched_code != employee_code:
+                    matched_name = recognition.get('employee_name', matched_code)
+                    return jsonify({
+                        'success': False,
+                        'message': (
+                            f'Khuôn mặt này đã thuộc về nhân viên '
+                            f'"{matched_name}" ({matched_code}). '
+                            f'Không thể đăng ký cho nhân viên khác.'
+                        )
+                    }), 409
+        except Exception:
+            pass  # If recognition check fails, proceed with registration
+
         result = face_service.add_face_embedding(
             employee_code=employee_code,
             embedding=face_encoding,
@@ -403,20 +503,155 @@ def get_embedding_statistics():
 # System now uses static photo capture (2-3 images) via /register-multi endpoint
 
 
-def _decode_image(image_data: str) -> Optional[np.ndarray]:
+def _process_image_for_recognition(image: np.ndarray, request_id: Optional[str] = None) -> dict:
+    """
+    Run face detection with fallbacks for small webcam frames.
+
+    Kiosk cameras may provide 320x240 frames. HOG with upsample=0 often misses
+    smaller faces, so retry with a modest upsample and a 2x frame before
+    returning "no face".
+    """
+    route_logger = current_app.logger
+
+    attempts = [
+        {
+            'name': 'original',
+            'image': image,
+            'upsample': getattr(face_detector, 'upsample', 0),
+        },
+        {
+            'name': 'original_upsample_1',
+            'image': image,
+            'upsample': max(getattr(face_detector, 'upsample', 0), 1),
+        },
+    ]
+
+    height, width = image.shape[:2]
+    if max(height, width) < 720:
+        scaled = cv2.resize(image, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        attempts.append({
+            'name': 'upscaled_2x_upsample_1',
+            'image': scaled,
+            'upsample': 1,
+        })
+
+        enhanced = ImageProcessor.enhance_for_face_recognition(scaled)
+        attempts.append({
+            'name': 'upscaled_2x_enhanced_upsample_1',
+            'image': enhanced,
+            'upsample': 1,
+        })
+
+    last_result = None
+    for attempt in attempts:
+        detector = face_detector
+        if attempt['name'] != 'original' or attempt['upsample'] != getattr(face_detector, 'upsample', 0):
+            detector = FaceDetector(
+                model=getattr(face_detector, 'model', 'hog'),
+                tolerance=getattr(face_detector, 'tolerance', None),
+                upsample=attempt['upsample'],
+            )
+
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Detection attempt: name=%s image=%s model=%s upsample=%s",
+            request_id,
+            attempt['name'],
+            _describe_decoded_image(attempt['image']),
+            getattr(detector, 'model', None),
+            getattr(detector, 'upsample', None),
+        )
+        result = detector.process_image(attempt['image'])
+        result['detection_attempt'] = attempt['name']
+        last_result = result
+
+        route_logger.info(
+            "[FACE_RECOGNIZE:%s] Detection attempt result: name=%s faces_found=%s encodings=%s error=%s",
+            request_id,
+            attempt['name'],
+            result.get('faces_found'),
+            len(result.get('face_encodings') or []),
+            result.get('error'),
+        )
+
+        if result.get('error') or result.get('faces_found', 0) > 0:
+            return result
+
+    return last_result or {
+        'faces_found': 0,
+        'face_locations': [],
+        'face_encodings': [],
+        'names': [],
+    }
+
+
+def _describe_image_payload(image_data: str) -> str:
+    if not isinstance(image_data, str):
+        return f"type={type(image_data).__name__}"
+
+    prefix, base64_data = ('', image_data)
+    if ',' in image_data:
+        prefix, base64_data = image_data.split(',', 1)
+
+    return (
+        f"type=str length={len(image_data)} has_data_url={bool(prefix)} "
+        f"prefix={prefix[:60]!r} base64_length={len(base64_data)}"
+    )
+
+
+def _describe_decoded_image(image: np.ndarray) -> str:
+    if image is None:
+        return "None"
+
+    summary = f"shape={image.shape} dtype={image.dtype}"
+    if image.size:
+        summary += f" min={int(np.min(image))} max={int(np.max(image))}"
+    return summary
+
+
+def _decode_image(image_data: str, request_id: Optional[str] = None) -> Optional[np.ndarray]:
 
     try:
+        decode_logger = current_app.logger
+        if not isinstance(image_data, str):
+            decode_logger.warning(
+                "[FACE_RECOGNIZE:%s] Image payload is not a string: type=%s",
+                request_id,
+                type(image_data).__name__,
+            )
+            return None
+
         # Remove data URL prefix if present
         if ',' in image_data:
-            image_data = image_data.split(',')[1]
+            prefix, image_data = image_data.split(',', 1)
+            decode_logger.info(
+                "[FACE_RECOGNIZE:%s] Stripped data URL prefix: %s",
+                request_id,
+                prefix[:80],
+            )
         
         # Decode base64
-        image_bytes = base64.b64decode(image_data)
+        image_bytes = base64.b64decode(image_data, validate=True)
+        decode_logger.info("[FACE_RECOGNIZE:%s] Base64 decoded: bytes=%s", request_id, len(image_bytes))
         
         # Convert to PIL Image
         pil_image = Image.open(io.BytesIO(image_bytes))
+        decode_logger.info(
+            "[FACE_RECOGNIZE:%s] PIL image opened: format=%s mode=%s size=%s",
+            request_id,
+            pil_image.format,
+            pil_image.mode,
+            pil_image.size,
+        )
         
         # Convert to numpy array
+        if pil_image.mode not in ('RGB', 'L'):
+            decode_logger.info(
+                "[FACE_RECOGNIZE:%s] Converting PIL mode from %s to RGB",
+                request_id,
+                pil_image.mode,
+            )
+            pil_image = pil_image.convert('RGB')
+
         image_array = np.array(pil_image)
         
         # Convert RGB to BGR for OpenCV
@@ -425,6 +660,9 @@ def _decode_image(image_data: str) -> Optional[np.ndarray]:
         
         return image_array
         
-    except Exception as e:
-        logger.error(f"Error decoding image: {str(e)}")
+    except (binascii.Error, ValueError) as e:
+        current_app.logger.warning("[FACE_RECOGNIZE:%s] Invalid base64 image payload: %s", request_id, str(e))
+        return None
+    except Exception:
+        current_app.logger.exception("[FACE_RECOGNIZE:%s] Error decoding image", request_id)
         return None

@@ -5,6 +5,7 @@ from app.models import Employee, Attendance
 from datetime import datetime, date
 import os
 from app.utils.image_utils import ImageProcessor
+from app.utils.timezone_utils import get_local_now
 
 bp = Blueprint('kiosk', __name__, url_prefix='/kiosk')
 
@@ -56,6 +57,11 @@ def _validate_schedule(employee, today):
 
 
 def _next_punch_action(attendance):
+    """Legacy strict sequential slot picker.
+
+    Retained for callers that still want the order-based behaviour. The kiosk
+    endpoints prefer :func:`_resolve_time_based_action`.
+    """
     if attendance.check_in_time is None:
         return 'check-in'
     if attendance.check_out_time is None:
@@ -78,6 +84,84 @@ def _next_punch_action(attendance):
             return 'overtime_check-out'
 
     return None
+
+
+def _resolve_time_based_action(attendance, now):
+    """Pick the punch action by mapping the wall-clock time to a slot.
+
+    Rules:
+        - Before 12:00 -> ``check_in_time`` (morning check-in)
+        - 12:00 - 13:00:
+            * If ``check_in_time`` already filled -> ``check_out_time``
+              (lunch check-out).
+            * If ``check_in_time`` is empty -> ``check_in_time_2``
+              (employee skipped the morning check-in).
+        - 13:00 - 17:00:
+            * If any prior check-in exists and ``check_out_time_2`` is empty
+              -> ``check_out_time_2`` (afternoon check-out).
+        - 17:00+ and OT slots -> handled separately via OT logic.
+
+    Returns either a tuple ``(action_type, slot)`` for the regular slots, an
+    OT action string, or ``None`` to indicate the punch should be skipped.
+    """
+    morning_end = now.replace(hour=12, minute=0, second=0, microsecond=0)
+    lunch_end = now.replace(hour=13, minute=0, second=0, microsecond=0)
+    afternoon_end = now.replace(hour=17, minute=0, second=0, microsecond=0)
+
+    if now < morning_end:
+        if attendance.check_in_time is None:
+            return ('check-in', 1)
+        return None
+
+    if now < lunch_end:
+        if attendance.check_in_time is not None and attendance.check_out_time is None:
+            return ('check-out', 1)
+        if attendance.check_in_time is None and attendance.check_in_time_2 is None:
+            # Skipped the morning check-in: write to the afternoon slot.
+            return ('check-in', 2)
+        return None
+
+    if now < afternoon_end:
+        has_any_checkin = (
+            attendance.check_in_time is not None
+            or attendance.check_in_time_2 is not None
+        )
+        if has_any_checkin and attendance.check_out_time_2 is None:
+            return ('check-out', 2)
+        return None
+
+    # 17:00 and beyond: defer to OT logic (handled by caller).
+    return None
+
+
+def _resolve_overtime_action(attendance):
+    """Pick the OT slot if an approved overtime request exists."""
+    try:
+        approved_ot = attendance._get_approved_overtime_request()
+    except Exception:
+        approved_ot = None
+
+    if not approved_ot:
+        return None
+
+    if attendance.overtime_check_in_time is None:
+        return 'overtime_check-in'
+    if attendance.overtime_check_out_time is None:
+        return 'overtime_check-out'
+    return None
+
+
+def _pick_action_for_kiosk(attendance, now):
+    """Time-based action picker for the kiosk endpoints.
+
+    Combines :func:`_resolve_time_based_action` for the regular slots and
+    :func:`_resolve_overtime_action` for the overtime slots. Falls back to
+    None (skip silently) when no valid slot can be filled.
+    """
+    action = _resolve_time_based_action(attendance, now)
+    if action is not None:
+        return action
+    return _resolve_overtime_action(attendance)
 
 
 @bp.route('/attendance')
@@ -112,31 +196,43 @@ def check_in():
     attendance = _ensure_today_attendance(employee, today)
 
     attendance.employee = employee
-    # Determine the correct action (normal or overtime) based on current state
-    action_type = _next_punch_action(attendance)
+    # Determine the correct action (regular or overtime) using time-based rules
+    now = get_local_now()
+    action_type = _pick_action_for_kiosk(attendance, now)
     if action_type is None:
-        return jsonify({'status': 'error', 'message': 'Đã đủ 2 lần check-in và 2 lần check-out trong ngày'}), 409
+        return jsonify({
+            'status': 'success',
+            'message': 'Ngoài khung giờ chấm công',
+            'skipped': True,
+        })
+    explicit_slot = None
+    if isinstance(action_type, tuple):
+        explicit_slot = action_type[1]
+        action_type = action_type[0]
 
     try:
         if action_type == 'check-in':
-            punch_slot = attendance.check_in()
+            if explicit_slot is not None:
+                punch_slot = attendance.check_in(slot=explicit_slot)
+            else:
+                punch_slot = attendance.check_in()
         elif action_type == 'overtime_check-in':
             # record overtime check-in as the extra punch (slot 3)
-            timestamp = datetime.now()
+            timestamp = get_local_now()
             attendance.overtime_check_in_time = timestamp
             punch_slot = 3
         else:
             return jsonify({'status': 'error', 'message': 'Hành động không hợp lệ cho check-in'}), 409
     except ValueError as exc:
         return jsonify({'status': 'error', 'message': str(exc)}), 409
-    
+
     # Save photo if provided (base64 string)
     if photo_data and photo_data.startswith('data:image'):
         saved_path = _save_attendance_photo(photo_data, employee_code, today, 'check-in')
         if saved_path:
             # Associate photos only for normal slots; OT photos use the standard check-in/out photos
             _assign_attendance_photo(attendance, 'check-in', punch_slot if punch_slot in (1, 2) else 1, saved_path)
-    
+
     db.session.commit()
 
     return jsonify({'status': 'success', 'message': f'Check-in lần {punch_slot} thành công', 'punch_slot': punch_slot, 'attendance': attendance.to_dict()})
@@ -168,16 +264,28 @@ def check_out():
     attendance = _ensure_today_attendance(employee, today)
 
     attendance.employee = employee
-    # Determine the correct action (normal or overtime) based on current state
-    action_type = _next_punch_action(attendance)
+    # Determine the correct action (regular or overtime) using time-based rules
+    now = get_local_now()
+    action_type = _pick_action_for_kiosk(attendance, now)
     if action_type is None:
-        return jsonify({'status': 'error', 'message': 'Đã đủ 2 lần check-in và 2 lần check-out trong ngày'}), 409
+        return jsonify({
+            'status': 'success',
+            'message': 'Ngoài khung giờ chấm công',
+            'skipped': True,
+        })
+    explicit_slot = None
+    if isinstance(action_type, tuple):
+        explicit_slot = action_type[1]
+        action_type = action_type[0]
 
     try:
         if action_type == 'check-out':
-            punch_slot = attendance.check_out()
+            if explicit_slot is not None:
+                punch_slot = attendance.check_out(slot=explicit_slot)
+            else:
+                punch_slot = attendance.check_out()
         elif action_type == 'overtime_check-out':
-            timestamp = datetime.now()
+            timestamp = get_local_now()
             attendance.overtime_check_out_time = timestamp
             punch_slot = 4
             # After OT punch, recalc hours
@@ -191,13 +299,13 @@ def check_out():
             return jsonify({'status': 'error', 'message': 'Hành động không hợp lệ cho check-out'}), 409
     except ValueError as exc:
         return jsonify({'status': 'error', 'message': str(exc)}), 409
-    
+
     # Save photo if provided (base64 string)
     if photo_data and photo_data.startswith('data:image'):
         saved_path = _save_attendance_photo(photo_data, employee_code, today, 'check-out')
         if saved_path:
             _assign_attendance_photo(attendance, 'check-out', punch_slot if punch_slot in (1, 2) else 2, saved_path)
-    
+
     db.session.commit()
 
     return jsonify({'status': 'success', 'message': f'Check-out lần {punch_slot} thành công', 'punch_slot': punch_slot, 'attendance': attendance.to_dict()})
@@ -206,9 +314,8 @@ def check_out():
 @bp.route('/auto', methods=['POST'])
 def auto_attendance():
     """
-    Auto-detect and handle check-in or check-out based on current status.
-    If employee hasn't checked in today, do check-in.
-    If employee has checked in, do check-out.
+    Auto-detect and handle check-in or check-out based on the current wall-clock
+    time and the day's existing punches.
     """
     payload = request.get_json(silent=True) or {}
     employee_code = payload.get('employee_code')
@@ -232,21 +339,36 @@ def auto_attendance():
 
     attendance = _ensure_today_attendance(employee, today)
 
-    action_type = _next_punch_action(attendance)
+    now = get_local_now()
+    action_type = _pick_action_for_kiosk(attendance, now)
     if action_type is None:
-        return jsonify({'status': 'error', 'message': 'Đã đủ 2 lần check-in và 2 lần check-out trong ngày'}), 409
+        return jsonify({
+            'status': 'success',
+            'message': 'Ngoài khung giờ chấm công',
+            'skipped': True,
+        })
+    explicit_slot = None
+    if isinstance(action_type, tuple):
+        explicit_slot = action_type[1]
+        action_type = action_type[0]
 
     attendance.employee = employee
     try:
         if action_type == 'check-in':
-            punch_slot = attendance.check_in()
+            if explicit_slot is not None:
+                punch_slot = attendance.check_in(slot=explicit_slot)
+            else:
+                punch_slot = attendance.check_in()
         elif action_type == 'check-out':
-            punch_slot = attendance.check_out()
+            if explicit_slot is not None:
+                punch_slot = attendance.check_out(slot=explicit_slot)
+            else:
+                punch_slot = attendance.check_out()
         elif action_type == 'overtime_check-in':
-            attendance.overtime_check_in_time = datetime.now()
+            attendance.overtime_check_in_time = get_local_now()
             punch_slot = 3
         elif action_type == 'overtime_check-out':
-            attendance.overtime_check_out_time = datetime.now()
+            attendance.overtime_check_out_time = get_local_now()
             punch_slot = 4
             try:
                 attendance.calculate_working_hours()
@@ -258,13 +380,13 @@ def auto_attendance():
             return jsonify({'status': 'error', 'message': 'Hành động tự động không hợp lệ'}), 409
     except ValueError as exc:
         return jsonify({'status': 'error', 'message': str(exc)}), 409
-    
+
     # Save photo if provided (base64 string)
     if photo_data and photo_data.startswith('data:image'):
         saved_path = _save_attendance_photo(photo_data, employee_code, today, action_type)
         if saved_path:
             _assign_attendance_photo(attendance, action_type, punch_slot, saved_path)
-    
+
     db.session.commit()
 
     return jsonify({'status': 'success', 'message': f'{action_type.replace("-", " ").title()} lần {punch_slot} thành công', 'punch_slot': punch_slot, 'attendance': attendance.to_dict()})
@@ -295,7 +417,7 @@ def _save_attendance_photo(photo_data: str, employee_code: str, date_obj: date, 
         os.makedirs(attendance_dir, exist_ok=True)
         
         # Generate filename: employee_code_date_type_timestamp.jpg
-        timestamp = datetime.now().strftime('%H%M%S')
+        timestamp = get_local_now().strftime('%H%M%S')
         filename = f"{employee_code}_{date_obj.strftime('%Y%m%d')}_{photo_type}_{timestamp}.jpg"
         file_path = os.path.join(attendance_dir, filename)
         

@@ -60,6 +60,8 @@ train/
 # OS
 .DS_Store
 Thumbs.db
+attendance_dbx1.sql
+
 
 # Testing
 .pytest_cache/

@@ -210,7 +210,7 @@ class ExportService:
                 if check_in:
                     try:
                         dt = datetime.fromisoformat(check_in.replace('Z', '+00:00'))
-                        ws[f'C{row}'] = dt.strftime('%H:%M')
+                        ws[f'C{row}'] = dt.strftime('%H:%M:%S')
                     except:
                         ws[f'C{row}'] = (check_in[:5] if len(check_in) > 5 else check_in)
                 else:
@@ -221,7 +221,7 @@ class ExportService:
                 if check_out:
                     try:
                         dt = datetime.fromisoformat(check_out.replace('Z', '+00:00'))
-                        ws[f'D{row}'] = dt.strftime('%H:%M')
+                        ws[f'D{row}'] = dt.strftime('%H:%M:%S')
                     except:
                         ws[f'D{row}'] = (check_out[:5] if len(check_out) > 5 else check_out)
                 else:
@@ -235,7 +235,7 @@ class ExportService:
                 if ot_start:
                     try:
                         dt = datetime.fromisoformat(ot_start.replace('Z', '+00:00'))
-                        ws[f'F{row}'] = dt.strftime('%H:%M')
+                        ws[f'F{row}'] = dt.strftime('%H:%M:%S')
                     except:
                         ws[f'F{row}'] = (ot_start[:5] if len(ot_start) > 5 else ot_start)
                 else:
@@ -245,7 +245,7 @@ class ExportService:
                 if ot_end:
                     try:
                         dt = datetime.fromisoformat(ot_end.replace('Z', '+00:00'))
-                        ws[f'G{row}'] = dt.strftime('%H:%M')
+                        ws[f'G{row}'] = dt.strftime('%H:%M:%S')
                     except:
                         ws[f'G{row}'] = (ot_end[:5] if len(ot_end) > 5 else ot_end)
                 else:

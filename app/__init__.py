@@ -29,6 +29,25 @@ def create_app(config_name='development'):
     login_manager.init_app(app)
     migrate.init_app(app, db)
 
+    # Register Jinja2 template filters for timezone-aware datetime display
+    from app.utils.timezone_utils import to_local, format_time_24h, format_datetime_24h, format_time_input
+
+    @app.template_filter('to_local')
+    def _to_local_filter(dt):
+        return to_local(dt)
+
+    @app.template_filter('time_24h')
+    def _time_24h_filter(dt):
+        return format_time_24h(dt)
+
+    @app.template_filter('datetime_24h')
+    def _datetime_24h_filter(dt):
+        return format_datetime_24h(dt)
+
+    @app.template_filter('time_input')
+    def _time_input_filter(dt):
+        return format_time_input(dt)
+
     # Backfill attendance columns when the table already exists in an older schema.
     ensure_attendance_punch_columns(app)
     
@@ -42,6 +61,7 @@ def create_app(config_name='development'):
     
     # Create necessary directories
     create_directories(app)
+    _start_scheduler(app)
     
     # Register blueprints
     register_blueprints(app)
@@ -50,6 +70,28 @@ def create_app(config_name='development'):
     register_error_handlers(app)
     
     return app
+
+
+def _start_scheduler(app):
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from app.services.scheduler import cancel_overdue_requests
+
+    # Run immediately on startup to cancel any existing overdue requests
+    try:
+        cancel_overdue_requests(app)
+    except Exception:
+        pass
+
+    scheduler = BackgroundScheduler(daemon=True)
+    scheduler.add_job(
+        cancel_overdue_requests,
+        trigger='cron',
+        hour=0,
+        minute=5,
+        args=[app],
+        id='cancel_overdue_requests',
+    )
+    scheduler.start()
 
 
 def setup_logging(app):

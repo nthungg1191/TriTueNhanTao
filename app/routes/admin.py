@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm import subqueryload
 from app import db
 from app.models import Employee, Attendance, Department, WorkSchedule, User
-from app.models.time_off import OvertimeRequest, LeaveRequest
+from app.models.time_off import OvertimeRequest, LeaveRequest, AttendanceCorrectionRequest
 from app.services.notification_service import NotificationService
 from datetime import date, datetime, time, timedelta
 import os
@@ -13,6 +13,7 @@ import uuid
 import cv2
 import numpy as np
 from sqlalchemy.exc import IntegrityError
+from app.utils.timezone_utils import get_local_now, to_local, format_time_input
 # Lazy-import face services inside functions to avoid import-time errors
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -21,7 +22,7 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 @bp.route('/requests')
 @login_required
 def requests():
-    """View pending overtime and leave requests for admin to approve/reject"""
+    """View pending overtime, leave and correction requests for admin to approve/reject"""
     # Filters from query string
     kind = request.args.get('kind', 'all')
     start_date = _parse_date_string(request.args.get('start_date'))
@@ -29,6 +30,7 @@ def requests():
 
     overtime_requests = []
     leave_requests = []
+    correction_requests = []
 
     if kind in ('all', 'overtime'):
         q = OvertimeRequest.query
@@ -46,9 +48,18 @@ def requests():
             q2 = q2.filter(LeaveRequest.end_date <= end_date)
         leave_requests = q2.order_by(LeaveRequest.created_at.desc()).all()
 
+    if kind in ('all', 'correction'):
+        q3 = AttendanceCorrectionRequest.query
+        if start_date:
+            q3 = q3.filter(AttendanceCorrectionRequest.date >= start_date)
+        if end_date:
+            q3 = q3.filter(AttendanceCorrectionRequest.date <= end_date)
+        correction_requests = q3.order_by(AttendanceCorrectionRequest.created_at.desc()).all()
+
     return render_template('admin/requests.html',
                            overtime_requests=overtime_requests,
-                           leave_requests=leave_requests)
+                           leave_requests=leave_requests,
+                           correction_requests=correction_requests)
 
 
 @bp.route('/requests/<string:kind>/<int:request_id>')
@@ -57,6 +68,8 @@ def request_detail(kind: str, request_id: int):
     """Show detail for a specific request and allow admin to add note on review."""
     if kind == 'overtime':
         req = OvertimeRequest.query.get_or_404(request_id)
+    elif kind == 'correction':
+        req = AttendanceCorrectionRequest.query.get_or_404(request_id)
     else:
         req = LeaveRequest.query.get_or_404(request_id)
 
@@ -67,12 +80,12 @@ def request_detail(kind: str, request_id: int):
 @login_required
 def approve_overtime(request_id: int):
     req = OvertimeRequest.query.get_or_404(request_id)
-    if req.is_overdue:
-        flash('Yêu cầu này đã quá hạn nên không thể duyệt.', 'warning')
+    if req.status == 'cancelled':
+        flash('Yêu cầu này đã bị quá hạn tự động.', 'warning')
         return redirect(url_for('admin.requests'))
     req.status = 'approved'
     req.reviewer_id = current_user.id
-    req.reviewed_at = datetime.now()
+    req.reviewed_at = get_local_now()
     # Ensure an Attendance record exists for that employee/date and set default OT window (17:30-20:00)
     try:
         attendance = Attendance.query.filter_by(employee_id=req.employee_id, date=req.date).first()
@@ -141,14 +154,14 @@ def approve_overtime(request_id: int):
 @login_required
 def reject_overtime(request_id: int):
     req = OvertimeRequest.query.get_or_404(request_id)
-    if req.is_overdue:
-        flash('Yêu cầu này đã quá hạn nên không thể từ chối.', 'warning')
+    if req.status == 'cancelled':
+        flash('Yêu cầu này đã bị quá hạn tự động.', 'warning')
         return redirect(url_for('admin.requests'))
     admin_note = request.form.get('admin_note')
     req.status = 'rejected'
     req.admin_note = admin_note
     req.reviewer_id = current_user.id
-    req.reviewed_at = datetime.now()
+    req.reviewed_at = get_local_now()
     db.session.commit()
     NotificationService.send_notification(req.employee_id, 'overtime_rejected', f'Yêu cầu tăng ca ngày {req.date} bị từ chối. Lý do: {admin_note or "Không có"}')
     flash('Đã từ chối yêu cầu tăng ca.', 'info')
@@ -159,12 +172,12 @@ def reject_overtime(request_id: int):
 @login_required
 def approve_leave(request_id: int):
     req = LeaveRequest.query.get_or_404(request_id)
-    if req.is_overdue:
-        flash('Yêu cầu này đã quá hạn nên không thể duyệt.', 'warning')
+    if req.status == 'cancelled':
+        flash('Yêu cầu này đã bị quá hạn tự động.', 'warning')
         return redirect(url_for('admin.requests'))
     req.status = 'approved'
     req.reviewer_id = current_user.id
-    req.reviewed_at = datetime.now()
+    req.reviewed_at = get_local_now()
     # Auto-reject any pending overtime requests that overlap with approved leave
     try:
         OvertimeRequest.query.filter(
@@ -187,17 +200,89 @@ def approve_leave(request_id: int):
 @login_required
 def reject_leave(request_id: int):
     req = LeaveRequest.query.get_or_404(request_id)
-    if req.is_overdue:
-        flash('Yêu cầu này đã quá hạn nên không thể từ chối.', 'warning')
+    if req.status == 'cancelled':
+        flash('Yêu cầu này đã bị quá hạn tự động.', 'warning')
         return redirect(url_for('admin.requests'))
     admin_note = request.form.get('admin_note')
     req.status = 'rejected'
     req.admin_note = admin_note
     req.reviewer_id = current_user.id
-    req.reviewed_at = datetime.now()
+    req.reviewed_at = get_local_now()
     db.session.commit()
     NotificationService.send_notification(req.employee_id, 'leave_rejected', f'Yêu cầu xin nghỉ {req.start_date} -> {req.end_date} bị từ chối. Lý do: {admin_note or "Không có"}')
     flash('Đã từ chối yêu cầu xin nghỉ.', 'info')
+    return redirect(url_for('admin.requests'))
+
+
+# ========== ATTENDANCE CORRECTION ==========
+
+@bp.route('/requests/attendance-correction/<int:request_id>/approve', methods=['POST'])
+@login_required
+def approve_correction(request_id: int):
+    req = AttendanceCorrectionRequest.query.get_or_404(request_id)
+
+    req.status = 'approved'
+    req.reviewer_id = current_user.id
+    req.reviewed_at = get_local_now()
+    admin_note = request.form.get('admin_note', '').strip()
+    if admin_note:
+        req.admin_note = admin_note
+
+    try:
+        # Tạo/cập nhật bản Attendance cho employee_id + date
+        attendance = Attendance.query.filter_by(employee_id=req.employee_id, date=req.date).first()
+
+        if not attendance:
+            attendance = Attendance(
+                employee_id=req.employee_id,
+                employee=req.employee,
+                date=req.date,
+                working_hours=0.0,
+                overtime_hours=0.0,
+            )
+            db.session.add(attendance)
+
+        # Gán các giờ check-in/out từ yêu cầu (chỉ ghi đè nếu có giá trị)
+        if req.check_in_time:
+            attendance.check_in_time = req.check_in_time
+        if req.check_out_time:
+            attendance.check_out_time = req.check_out_time
+        if req.check_in_time_2:
+            attendance.check_in_time_2 = req.check_in_time_2
+        if req.check_out_time_2:
+            attendance.check_out_time_2 = req.check_out_time_2
+
+        attendance.calculate_working_hours()
+        attendance.update_status()
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    NotificationService.send_notification(
+        req.employee_id, 'correction_approved',
+        f'Yêu cầu bổ sung chấm công ngày {req.date} đã được duyệt.'
+    )
+    flash('Đã duyệt yêu cầu bổ sung chấm công và cập nhật bản ghi chấm công.', 'success')
+    return redirect(url_for('admin.requests'))
+
+
+@bp.route('/requests/attendance-correction/<int:request_id>/reject', methods=['POST'])
+@login_required
+def reject_correction(request_id: int):
+    req = AttendanceCorrectionRequest.query.get_or_404(request_id)
+    admin_note = request.form.get('admin_note')
+    req.status = 'rejected'
+    req.admin_note = admin_note
+    req.reviewer_id = current_user.id
+    req.reviewed_at = get_local_now()
+    db.session.commit()
+    NotificationService.send_notification(
+        req.employee_id, 'correction_rejected',
+        f'Yêu cầu bổ sung chấm công ngày {req.date} bị từ chối. Lý do: {admin_note or "Không có"}'
+    )
+    flash('Đã từ chối yêu cầu bổ sung chấm công.', 'info')
     return redirect(url_for('admin.requests'))
 
 
@@ -225,8 +310,14 @@ def _save_employee_photo(file_storage):
     return f"/static/uploads/employees/{filename}", image, None
 
 
-def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, photo_path: str = None):
-    """Generate face encoding from employee photo and upsert embeddings."""
+def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, photo_path: str = None, skip_employee_code: str = None):
+    """Generate face encoding from employee photo and upsert embeddings.
+
+    Args:
+        skip_employee_code: When set, exclude this employee_code from the
+            duplicate-face check (used during employee edit to allow re-uploading
+            the same person's photo).
+    """
     try:
         from app.services.face_detection import FaceDetector
         from app.services.face_service import FaceService
@@ -244,6 +335,22 @@ def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, ph
 
     face_encoding = detect_result['face_encodings'][0]
     face_service = FaceService(db.session)
+
+    # --- Duplicate face check ---
+    try:
+        recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+        if recognition.get('success') and recognition.get('employee_code'):
+            matched_code = recognition['employee_code']
+            if matched_code != employee_code:
+                matched_name = recognition.get('employee_name', matched_code)
+                return False, (
+                    f'Khuôn mặt này đã thuộc về nhân viên '
+                    f'"{matched_name}" ({matched_code}). '
+                    f'Không thể đăng ký cho nhân viên khác.'
+                )
+            # matched_code == employee_code → same employee, allowed
+    except Exception:
+        pass  # If recognition check fails, proceed with registration
 
     legacy_result = face_service.register_employee_face(
         employee_code=employee_code,
@@ -330,6 +437,17 @@ def _parse_date_string(value):
     return None
 
 
+def _parse_local_datetime(value):
+    """Parse a datetime-local input (YYYY-MM-DDTHH:MM) and attach local timezone."""
+    if not value:
+        return None
+    try:
+        dt = datetime.strptime(value.strip(), '%Y-%m-%dT%H:%M')
+        return to_local(dt)
+    except ValueError:
+        return None
+
+
 @bp.before_request
 def require_admin():
     """Ensure only admin users access admin routes."""
@@ -408,7 +526,7 @@ def employees():
     """Employee management page"""
     employees = Employee.query.options(
         subqueryload(Employee.face_embeddings)
-    ).order_by(Employee.created_at.desc()).all()
+    ).filter_by(is_active=True).order_by(Employee.created_at.desc()).all()
     departments = Department.query.filter_by(is_active=True).order_by(Department.name).all()
     return render_template('admin/employees.html', 
                          employees=employees,
@@ -691,7 +809,7 @@ def employee_edit(employee_id: int):
             emp.photo_path = photo_path
             db.session.commit()
 
-            face_ok, face_message = _register_face_from_employee_photo(emp.employee_code, image, photo_path)
+            face_ok, face_message = _register_face_from_employee_photo(emp.employee_code, image, photo_path, skip_employee_code=emp.employee_code)
             flash(face_message, 'success' if face_ok else 'warning')
 
         flash('Cập nhật nhân viên thành công.', 'success')
@@ -711,23 +829,16 @@ def employee_delete(employee_id: int):
     employee_code = emp.employee_code
     
     try:
-        # Delete related face embeddings first
+        # Soft delete: deactivate employee instead of hard delete
+        emp.is_active = False
+
+        # Deactivate face embeddings to hide from recognition
         from app.models.face_embedding import FaceEmbedding
-        FaceEmbedding.query.filter_by(employee_id=emp.id).delete()
-        # Also remove related time-off requests to avoid FK constraint errors
-        try:
-            from app.models.time_off import LeaveRequest, OvertimeRequest
-            LeaveRequest.query.filter_by(employee_id=emp.id).delete()
-            OvertimeRequest.query.filter_by(employee_id=emp.id).delete()
-        except Exception:
-            # If time_off models aren't available, continue and let DB handle or raise
-            pass
-        
-        # Delete the employee (attendance and work_schedules will cascade delete automatically)
-        db.session.delete(emp)
+        FaceEmbedding.query.filter_by(employee_id=emp.id).update({'is_active': False})
+
         db.session.commit()
-        
-        flash(f'✓ Đã xóa nhân viên {employee_code}', 'success')
+
+        flash(f'Đã ẩn nhân viên {employee_code}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ Lỗi xóa nhân viên: {str(e)}', 'danger')
@@ -1151,58 +1262,13 @@ def attendance_new():
             flash('Bản ghi chấm công cho nhân viên này trong ngày này đã tồn tại. Vui lòng sửa bản ghi hiện có.', 'warning')
             return redirect(url_for('admin.attendance_edit', attendance_id=existing.id))
         
-        # Get check-in time
-        check_in_str = request.form.get('check_in_time', '').strip()
-        check_in_time = None
-        if check_in_str:
-            try:
-                check_in_time = datetime.strptime(check_in_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-        
-        # Get check-out time
-        check_out_str = request.form.get('check_out_time', '').strip()
-        check_out_time = None
-        if check_out_str:
-            try:
-                check_out_time = datetime.strptime(check_out_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get second check-in time
-        check_in_str_2 = request.form.get('check_in_time_2', '').strip()
-        check_in_time_2 = None
-        if check_in_str_2:
-            try:
-                check_in_time_2 = datetime.strptime(check_in_str_2, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get second check-out time
-        check_out_str_2 = request.form.get('check_out_time_2', '').strip()
-        check_out_time_2 = None
-        if check_out_str_2:
-            try:
-                check_out_time_2 = datetime.strptime(check_out_str_2, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get overtime check-in/out
-        overtime_check_in_str = request.form.get('overtime_check_in_time', '').strip()
-        overtime_check_in_time = None
-        if overtime_check_in_str:
-            try:
-                overtime_check_in_time = datetime.strptime(overtime_check_in_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        overtime_check_out_str = request.form.get('overtime_check_out_time', '').strip()
-        overtime_check_out_time = None
-        if overtime_check_out_str:
-            try:
-                overtime_check_out_time = datetime.strptime(overtime_check_out_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
+        # Get check-in/out times (parse as local timezone)
+        check_in_time = _parse_local_datetime(request.form.get('check_in_time'))
+        check_out_time = _parse_local_datetime(request.form.get('check_out_time'))
+        check_in_time_2 = _parse_local_datetime(request.form.get('check_in_time_2'))
+        check_out_time_2 = _parse_local_datetime(request.form.get('check_out_time_2'))
+        overtime_check_in_time = _parse_local_datetime(request.form.get('overtime_check_in_time'))
+        overtime_check_out_time = _parse_local_datetime(request.form.get('overtime_check_out_time'))
         
         # Get status
         status = request.form.get('status', 'present').strip()
@@ -1320,58 +1386,13 @@ def attendance_edit(attendance_id: int):
                                  employees=employees,
                                  today=date.today())
         
-        # Get check-in time
-        check_in_str = request.form.get('check_in_time', '').strip()
-        check_in_time = None
-        if check_in_str:
-            try:
-                check_in_time = datetime.strptime(check_in_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-        
-        # Get check-out time
-        check_out_str = request.form.get('check_out_time', '').strip()
-        check_out_time = None
-        if check_out_str:
-            try:
-                check_out_time = datetime.strptime(check_out_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get second check-in time
-        check_in_str_2 = request.form.get('check_in_time_2', '').strip()
-        check_in_time_2 = None
-        if check_in_str_2:
-            try:
-                check_in_time_2 = datetime.strptime(check_in_str_2, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get second check-out time
-        check_out_str_2 = request.form.get('check_out_time_2', '').strip()
-        check_out_time_2 = None
-        if check_out_str_2:
-            try:
-                check_out_time_2 = datetime.strptime(check_out_str_2, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        # Get overtime check-in/out
-        overtime_check_in_str = request.form.get('overtime_check_in_time', '').strip()
-        overtime_check_in_time = None
-        if overtime_check_in_str:
-            try:
-                overtime_check_in_time = datetime.strptime(overtime_check_in_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
-
-        overtime_check_out_str = request.form.get('overtime_check_out_time', '').strip()
-        overtime_check_out_time = None
-        if overtime_check_out_str:
-            try:
-                overtime_check_out_time = datetime.strptime(overtime_check_out_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
-                pass
+        # Get check-in/out times (parse as local timezone)
+        check_in_time = _parse_local_datetime(request.form.get('check_in_time'))
+        check_out_time = _parse_local_datetime(request.form.get('check_out_time'))
+        check_in_time_2 = _parse_local_datetime(request.form.get('check_in_time_2'))
+        check_out_time_2 = _parse_local_datetime(request.form.get('check_out_time_2'))
+        overtime_check_in_time = _parse_local_datetime(request.form.get('overtime_check_in_time'))
+        overtime_check_out_time = _parse_local_datetime(request.form.get('overtime_check_out_time'))
         
         # Get status
         status = request.form.get('status', 'present').strip()

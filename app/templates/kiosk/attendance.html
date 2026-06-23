@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kiosk Chấm Công - Nhận Diện</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -15,19 +16,36 @@
         h1 { font-size: 28px; font-weight: 700; letter-spacing: .3px; }
         .sub { opacity:.85; margin-top: 4px; font-size: 14px; }
         .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; }
-        video, canvas { width: 320px; height: 240px; background:#020617; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); }
+        video, canvas { width: 320px; max-width: 100%; height: auto; aspect-ratio: 4/3; background:#020617; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); }
         video { transform: scaleX(-1); }
         .side { flex:1; min-width: 220px; }
         .controls { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
-        .btn { display:inline-block; padding: 12px 20px; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.18s ease; border: 2px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; background: rgba(255,255,255,0.06); }
+        .btn { display:inline-block; padding: 12px 20px; min-height: 44px; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600; transition: all 0.18s ease; border: 2px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; background: rgba(255,255,255,0.06); }
         .btn:hover { background: rgba(255,255,255,0.09); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
         .btn-primary { background: rgba(255,255,255,0.06); color: white; border: 2px solid rgba(255,255,255,0.12); }
         .btn-primary:hover { background: rgba(255,255,255,0.10); }
         .status { margin-top: 12px; font-size: 14px; min-height: 22px; }
         .tips { margin-top: 12px; font-size: 13px; opacity:.9; }
         .auto-badge { display:inline-flex; align-items:center; gap:8px; margin-top:12px; padding:8px 12px; border-radius:999px; background: rgba(20,184,166,0.16); font-size: 13px; border:1px solid rgba(255,255,255,0.12); }
-        .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; }
+        .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
         a.link { color:#ccfbf1; opacity:.95; text-decoration: none; border-bottom:1px dashed rgba(204,251,241,0.55); }
+
+        @media (max-width: 768px) {
+            .wrap { width: 96%; padding: 20px 16px; border-radius: 16px; }
+            h1 { font-size: 22px; }
+            .row { flex-direction: column; gap: 12px; }
+            .row > div { width: 100%; }
+            video, canvas { width: 100%; }
+            .side { width: 100%; }
+            .controls .btn { flex: 1; min-width: 0; text-align: center; }
+            .topbar { flex-direction: column; align-items: flex-start; }
+        }
+
+        @media (max-width: 480px) {
+            .wrap { width: 100%; margin: 0; min-height: 100vh; border-radius: 0; padding: 16px 12px; }
+            h1 { font-size: 20px; }
+            .btn { padding: 10px 14px; font-size: 13px; }
+        }
     </style>
     <meta http-equiv="Cache-Control" content="no-store" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -48,7 +66,7 @@
         <div class="row">
             <div>
                 <video id="video" autoplay playsinline muted></video>
-                <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
+                <canvas id="canvas" width="640" height="480" style="display:none"></canvas>
             </div>
             <div class="side">
                 <div class="controls">
@@ -82,7 +100,7 @@ const statusEl = qs('#status');
 
 async function startCamera() {
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
         video.srcObject = stream;
         statusEl.textContent = '📷 Camera đã bật.';
         startAutoRecognition();
@@ -102,11 +120,13 @@ function stopCamera() {
 
 function captureDataURL() {
     const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     ctx.save();
     ctx.scale(-1, 1);
     ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
     ctx.restore();
-    return canvas.toDataURL('image/jpeg', 0.7);
+    return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 const AUTO_RECOGNITION_INTERVAL_MS = 900;

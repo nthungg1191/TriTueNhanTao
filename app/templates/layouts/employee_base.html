@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Nhân viên - Hệ thống chấm công{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -192,7 +193,7 @@
         .status-approved { background: #ecfdf5; color: #166534; }
         .status-rejected { background: #fee2e2; color: #991b1b; }
         .status-withdrawn { background: #e2e8f0; color: #475569; }
-        .status-overdue { background: #fff7ed; color: #c2410c; }
+        .status-cancelled { background: #fff1f2; color: #9f1239; }
         .confirm-modal {
             display: none;
             position: fixed;
@@ -439,6 +440,13 @@
                         🛌 Xin nghỉ
                     </a>
                 </li>
+                <li>
+                    <a href="{{ url_for('employee.attendance_correction') }}" 
+                       onclick="closeSidebar()"
+                       class="{% if request.endpoint == 'employee.attendance_correction' %}active{% endif %}">
+                        ✏️ Bổ sung chấm công
+                    </a>
+                </li>
                 <li style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.2);">
                     <a href="{{ url_for('auth.logout') }}" onclick="closeSidebar()">
                         🚪 Đăng xuất
@@ -528,5 +536,6 @@
             }
         });
     </script>
+    <script src="{{ url_for('static', filename='js/responsive-tables.js') }}"></script>
 </body>
 </html>

@@ -1,0 +1,493 @@
+/* ============================================================
+   Responsive CSS - Mobile-first overrides
+   Breakpoints: 1024px (tablet), 768px (mobile), 480px (small mobile)
+   ============================================================ */
+
+/* Prevent horizontal scroll on the whole page */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+/* Smooth font rendering on small screens */
+body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: rgba(20, 184, 166, 0.15);
+}
+
+/* Avoid text selection on nav (better mobile UX) */
+.sidebar .nav a,
+.mobile-menu-btn,
+.btn,
+.nav-link {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ============================================================
+   TABLET (≤1024px)
+   ============================================================ */
+@media (max-width: 1024px) {
+    /* Admin dashboard: stack chart + alerts */
+    .dashboard-grid,
+    .charts-row,
+    .two-col {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Reduce padding on page wrappers */
+    .dashboard,
+    .employees-page,
+    .attendance-page,
+    .requests-page,
+    .schedules-page,
+    .reports-page {
+        padding: 16px !important;
+    }
+
+    /* Stat card value smaller */
+    .stat-card-value,
+    .stat-value {
+        font-size: 28px !important;
+    }
+
+    /* Page header */
+    .page-header h1 {
+        font-size: 22px !important;
+    }
+}
+
+/* ============================================================
+   MOBILE (≤768px)
+   ============================================================ */
+@media (max-width: 768px) {
+    /* Page padding smaller */
+    .content {
+        padding: 12px !important;
+    }
+
+    .page-header,
+    .page {
+        padding: 16px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .page-header h1 {
+        font-size: 20px !important;
+        line-height: 1.3;
+    }
+
+    .page-header small {
+        font-size: 13px;
+    }
+
+    /* Card / form pages */
+    .card,
+    .form-card,
+    .form-container {
+        padding: 16px !important;
+        margin-bottom: 16px !important;
+        border-radius: 12px;
+    }
+
+    /* Stats grid: single column on mobile */
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        margin-bottom: 16px !important;
+    }
+
+    .stat-card,
+    .stat-card-value,
+    .stat-value {
+        padding: 16px !important;
+        min-height: auto;
+    }
+
+    .stat-value,
+    .stat-card-value {
+        font-size: 24px !important;
+    }
+
+    .stat-title,
+    .stat-card-title {
+        font-size: 12px;
+    }
+
+    /* Dashboard wrapper */
+    .dashboard,
+    .employees-page,
+    .attendance-page,
+    .requests-page,
+    .schedules-page,
+    .reports-page {
+        padding: 12px !important;
+    }
+
+    /* Page header: stack title + actions */
+    .page-header,
+    .attendance-page .page-header,
+    .employees-page .page-header,
+    .requests-page .page-header {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 12px;
+    }
+
+    .page-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .page-actions .btn {
+        flex: 1;
+        min-width: 0;
+        text-align: center;
+        justify-content: center;
+    }
+
+    /* Filters bar: stack vertically */
+    .filters-bar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 12px !important;
+        gap: 10px !important;
+    }
+
+    .filter-group {
+        width: 100% !important;
+    }
+
+    .filter-group label {
+        font-size: 12px;
+    }
+
+    .filter-select,
+    .filter-input,
+    .search-box input {
+        width: 100% !important;
+        min-width: 0 !important;
+        font-size: 16px; /* Prevent iOS zoom */
+        padding: 12px 14px !important;
+    }
+
+    .filter-actions,
+    .search-box {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .filter-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Tables: enable horizontal scroll + smaller cells */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -12px;
+        padding: 0 12px;
+        width: calc(100% + 24px);
+    }
+
+    .table-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+        min-width: 560px;
+        font-size: 13px;
+    }
+
+    .table th,
+    .table td {
+        padding: 10px 8px !important;
+        font-size: 12px !important;
+        white-space: nowrap;
+    }
+
+    .table thead th {
+        font-size: 11px !important;
+        text-transform: uppercase;
+    }
+
+    /* Action buttons inside table cells */
+    .table .btn,
+    .table .btn-sm,
+    .table-actions .btn {
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+    }
+
+    .table .btn-group,
+    .table-actions {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    /* Form rows: single column */
+    .form-row {
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+    }
+
+    .form-actions {
+        flex-direction: column !important;
+        gap: 8px;
+    }
+
+    .form-actions .btn {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* All inputs: 16px to prevent iOS zoom */
+    input[type="text"],
+    input[type="number"],
+    input[type="time"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    select,
+    textarea,
+    .form-control,
+    .form-input {
+        font-size: 16px !important;
+        width: 100%;
+    }
+
+    textarea.form-control {
+        min-height: 80px;
+    }
+
+    /* Buttons: full width or stack */
+    .actions {
+        flex-direction: column !important;
+        width: 100%;
+    }
+
+    .actions .btn {
+        width: 100% !important;
+        text-align: center;
+        justify-content: center;
+    }
+
+    /* Stat badges (filters summary) */
+    .stats-bar,
+    .stat-badges {
+        flex-wrap: wrap;
+        gap: 8px !important;
+    }
+
+    .stat-badge {
+        flex: 1;
+        min-width: calc(50% - 4px);
+        text-align: center;
+    }
+
+    /* Alerts */
+    .alert {
+        padding: 12px 14px !important;
+        font-size: 14px;
+    }
+
+    /* Modal */
+    .confirm-modal,
+    .photo-modal,
+    .modal {
+        padding: 12px;
+    }
+
+    .confirm-modal-card,
+    .modal-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 90vh;
+        overflow-y: auto;
+        border-radius: 16px !important;
+    }
+
+    .confirm-modal-actions {
+        flex-direction: column-reverse;
+        gap: 8px;
+    }
+
+    .confirm-modal-actions .btn {
+        width: 100%;
+    }
+
+    /* Card view toggle (employees): hide on mobile */
+    .view-toggle {
+        display: none !important;
+    }
+
+    /* Info grid (employee details) */
+    .info-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Pagination wrap */
+    .pagination {
+        flex-wrap: wrap;
+        gap: 6px !important;
+    }
+
+    .page-btn {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+    }
+
+    /* Chart card */
+    .chart-card,
+    .alerts-card {
+        padding: 16px !important;
+    }
+
+    .chart-card h3,
+    .alerts-card h3 {
+        font-size: 16px !important;
+    }
+
+    /* Card view: stack 1 column on small screens */
+    .card-view,
+    .employee-card,
+    .requests-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Hide less important columns when responsive-cards is enabled */
+    table.responsive-cards th.hide-mobile,
+    table.responsive-cards td.hide-mobile {
+        display: none;
+    }
+}
+
+/* ============================================================
+   SMALL MOBILE (≤480px)
+   ============================================================ */
+@media (max-width: 480px) {
+    .content {
+        padding: 8px !important;
+    }
+
+    .page-header h1 {
+        font-size: 18px !important;
+    }
+
+    .stat-value,
+    .stat-card-value {
+        font-size: 20px !important;
+    }
+
+    .stat-card,
+    .card,
+    .form-card {
+        padding: 12px !important;
+    }
+
+    .table th,
+    .table td {
+        padding: 8px 6px !important;
+        font-size: 11px !important;
+    }
+
+    .btn {
+        padding: 10px 14px !important;
+        font-size: 13px !important;
+    }
+
+    /* Radio options: stack on very small screens */
+    .radio-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .radio-option {
+        width: 100%;
+    }
+
+    /* Hide certain dashboard sections if too crowded */
+    .hide-xs {
+        display: none !important;
+    }
+}
+
+/* ============================================================
+   MOBILE CARD VIEW FOR TABLES
+   (Generated by responsive-tables.js)
+   ============================================================ */
+.table-cards-wrapper {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    table.responsive-cards {
+        display: none !important;
+    }
+
+    .table-cards-wrapper {
+        display: block;
+    }
+}
+
+.data-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+}
+
+.data-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 6px 0;
+    gap: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.data-card-row:last-child {
+    border-bottom: none;
+}
+
+.data-card-label {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    min-width: 100px;
+}
+
+.data-card-value {
+    color: #1f2937;
+    font-size: 14px;
+    text-align: right;
+    word-break: break-word;
+    flex: 1;
+}
+
+.data-card-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.data-card-actions .btn {
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+    justify-content: center;
+}

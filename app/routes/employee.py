@@ -7,8 +7,9 @@ from types import SimpleNamespace
 
 from app.models import Employee, SystemLog
 from app.models.attendance import Attendance
-from app.models.time_off import OvertimeRequest, LeaveRequest
+from app.models.time_off import OvertimeRequest, LeaveRequest, AttendanceCorrectionRequest
 from app.utils.time_off_utils import is_at_least_days_ahead
+from app.utils.timezone_utils import to_local, format_time_input
 
 
 bp = Blueprint('employee', __name__, url_prefix='/employee')
@@ -374,6 +375,165 @@ def withdraw_leave(request_id: int):
         'employee.leave',
         'Đã thu hồi yêu cầu xin nghỉ.',
         'employee_withdrew_leave_request'
+    )
+
+
+# ========== ATTENDANCE CORRECTION ==========
+
+REASON_TYPE_OPTIONS = [
+    ('missing_check_in', 'Thiếu check-in'),
+    ('missing_check_out', 'Thiếu check-out'),
+    ('wrong_time', 'Sai giờ'),
+    ('absent_correction', 'Bổ sung vắng mặt'),
+    ('other', 'Lý do khác'),
+]
+
+
+def _has_correction_conflict(employee_id, target_date):
+    return AttendanceCorrectionRequest.query.filter(
+        AttendanceCorrectionRequest.employee_id == employee_id,
+        AttendanceCorrectionRequest.date == target_date,
+        AttendanceCorrectionRequest.status.in_(['pending', 'approved'])
+    ).first() is not None
+
+
+@bp.route('/attendance-correction', methods=['GET', 'POST'])
+@login_required
+def attendance_correction():
+    emp = _get_employee_for_user()
+    if not emp:
+        flash('Không tìm thấy thông tin nhân viên cho tài khoản hiện tại.', 'warning')
+        return redirect(url_for('kiosk.attendance_only'))
+
+    if request.method == 'POST':
+        req_date = request.form.get('date')
+        reason_type = request.form.get('reason_type')
+        explanation = request.form.get('explanation', '').strip()
+
+        try:
+            dt = datetime.strptime(req_date, '%Y-%m-%d').date()
+        except Exception:
+            flash('Ngày không hợp lệ. Vui lòng dùng định dạng YYYY-MM-DD.', 'danger')
+            return redirect(url_for('employee.attendance_correction'))
+
+        # Chỉ cho yêu cầu cho ngày trong quá khứ (tối đa 7 ngày)
+        today = date.today()
+        if dt >= today:
+            flash('Chỉ có thể gửi yêu cầu bổ sung/chỉnh sửa cho ngày trong quá khứ.', 'danger')
+            return redirect(url_for('employee.attendance_correction'))
+
+        if dt < today - __import__('datetime').timedelta(days=7):
+            flash('Chỉ có thể gửi yêu cầu cho tối đa 7 ngày gần đây.', 'danger')
+            return redirect(url_for('employee.attendance_correction'))
+
+        if reason_type not in [r[0] for r in REASON_TYPE_OPTIONS]:
+            flash('Loại yêu cầu không hợp lệ.', 'danger')
+            return redirect(url_for('employee.attendance_correction'))
+
+        # Kiểm tra trùng lặp
+        if _has_correction_conflict(emp.id, dt):
+            flash('Đã có yêu cầu bổ sung/chỉnh sửa đang chờ duyệt hoặc đã duyệt cho ngày này.', 'warning')
+            return redirect(url_for('employee.attendance_correction'))
+
+        # Kiểm tra leave request approved trùng ngày
+        if _has_leave_conflict(emp.id, dt):
+            flash('Không thể gửi yêu cầu bổ sung chấm công cho ngày đã có yêu cầu xin nghỉ.', 'danger')
+            return redirect(url_for('employee.attendance_correction'))
+
+        # Parse giờ (optional)
+        check_in_time = None
+        check_out_time = None
+        check_in_time_2 = None
+        check_out_time_2 = None
+
+        check_in_str = request.form.get('check_in_time', '').strip()
+        check_out_str = request.form.get('check_out_time', '').strip()
+        check_in_2_str = request.form.get('check_in_time_2', '').strip()
+        check_out_2_str = request.form.get('check_out_time_2', '').strip()
+
+        if check_in_str:
+            try:
+                check_in_time = to_local(datetime.strptime(f"{req_date} {check_in_str}", '%Y-%m-%d %H:%M'))
+            except ValueError:
+                flash('Giờ check-in không hợp lệ.', 'danger')
+                return redirect(url_for('employee.attendance_correction'))
+
+        if check_out_str:
+            try:
+                check_out_time = to_local(datetime.strptime(f"{req_date} {check_out_str}", '%Y-%m-%d %H:%M'))
+            except ValueError:
+                flash('Giờ check-out không hợp lệ.', 'danger')
+                return redirect(url_for('employee.attendance_correction'))
+
+        if check_in_2_str:
+            try:
+                check_in_time_2 = to_local(datetime.strptime(f"{req_date} {check_in_2_str}", '%Y-%m-%d %H:%M'))
+            except ValueError:
+                flash('Giờ check-in 2 không hợp lệ.', 'danger')
+                return redirect(url_for('employee.attendance_correction'))
+
+        if check_out_2_str:
+            try:
+                check_out_time_2 = to_local(datetime.strptime(f"{req_date} {check_out_2_str}", '%Y-%m-%d %H:%M'))
+            except ValueError:
+                flash('Giờ check-out 2 không hợp lệ.', 'danger')
+                return redirect(url_for('employee.attendance_correction'))
+
+        correction = AttendanceCorrectionRequest(
+            employee_id=emp.id,
+            date=dt,
+            reason_type=reason_type,
+            check_in_time=check_in_time,
+            check_out_time=check_out_time,
+            check_in_time_2=check_in_time_2,
+            check_out_time_2=check_out_time_2,
+            explanation=explanation,
+            status='pending',
+        )
+        db.session.add(correction)
+        db.session.commit()
+
+        SystemLog.log_action(
+            user_id=current_user.id,
+            action='employee_submitted_correction',
+            entity_type='employee',
+            entity_id=emp.id,
+            details=f'{emp.name} gửi yêu cầu bổ sung chấm công ngày {dt}.',
+            status='success'
+        )
+
+        flash('Yêu cầu bổ sung chấm công đã được gửi.', 'success')
+        return redirect(url_for('employee.attendance_correction'))
+
+    # GET: form + lịch sử
+    requests = AttendanceCorrectionRequest.query.filter_by(
+        employee_id=emp.id
+    ).order_by(AttendanceCorrectionRequest.created_at.desc()).all()
+
+    # Lấy giờ chấm công hiện tại của ngày đang chọn (dùng JS hoặc query gần nhất)
+    return render_template('employee/attendance_correction.html',
+                           employee=emp,
+                           requests=requests,
+                           reason_types=REASON_TYPE_OPTIONS,
+                           today=date.today(),
+                           timedelta=__import__('datetime').timedelta)
+
+
+@bp.route('/attendance-correction/<int:correction_id>/withdraw', methods=['POST'])
+@login_required
+def withdraw_correction(correction_id: int):
+    emp = _get_employee_for_user()
+    if not emp:
+        flash('Không tìm thấy thông tin nhân viên cho tài khoản hiện tại.', 'warning')
+        return redirect(url_for('kiosk.attendance_only'))
+
+    correction = AttendanceCorrectionRequest.query.get_or_404(correction_id)
+    return _withdraw_time_off_request(
+        correction,
+        emp,
+        'employee.attendance_correction',
+        'Đã thu hồi yêu cầu bổ sung chấm công.',
+        'employee_withdrew_correction_request'
     )
 
 
