@@ -13,19 +13,32 @@ def get_database_url():
     database_url = os.getenv("DATABASE_URL") or os.getenv("MYSQL_URL")
 
     if database_url:
-        return database_url.replace("mysql://", "mysql+pymysql://", 1)
+        # Nếu lỡ nhập value có dấu nháy trong Railway thì bỏ đi
+        database_url = database_url.strip().strip('"').strip("'")
+
+        # Railway thường trả mysql://..., SQLAlchemy cần mysql+pymysql://...
+        if database_url.startswith("mysql://"):
+            database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
+
+        return database_url
 
     mysql_host = os.getenv("MYSQLHOST") or os.getenv("DB_HOST")
     mysql_port = os.getenv("MYSQLPORT") or os.getenv("DB_PORT", "3306")
     mysql_user = os.getenv("MYSQLUSER") or os.getenv("DB_USER") or os.getenv("DB_USERNAME", "root")
     mysql_password = os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", "")
-    mysql_database = os.getenv("MYSQLDATABASE") or os.getenv("MYSQL_DATABASE") or os.getenv("DB_DATABASE") or os.getenv("DB_NAME", "railway")
+    mysql_database = (
+        os.getenv("MYSQLDATABASE")
+        or os.getenv("MYSQL_DATABASE")
+        or os.getenv("DB_DATABASE")
+        or os.getenv("DB_NAME")
+        or "railway"
+    )
 
     if mysql_host:
         return f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
 
     return "mysql+pymysql://root:@localhost:3306/attendance_dbx1"
-
+    
 class Config:
     """Base configuration"""
     
