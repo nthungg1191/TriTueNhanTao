@@ -21,10 +21,13 @@ RUN apt-get update \
 
 COPY requirements.txt ./
 ENV CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-RUN pip install --upgrade pip \
-    && pip install cmake==3.27.7 \
-    && pip install -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel
 
+RUN pip install cmake==3.27.7
+
+RUN pip install --no-build-isolation dlib==19.24.2
+
+RUN pip install -r requirements.txt
 COPY . ./
 
 EXPOSE 5555
