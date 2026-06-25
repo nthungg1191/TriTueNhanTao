@@ -1,0 +1,208 @@
+<mxfile host="app.diagrams.net" agent="github-copilot">
+  <diagram name="UC03.4: Xóa lịch làm việc" id="UC03_4_diag">
+    <mxGraphModel dx="2491" dy="924" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lane_admin" parent="1" style="swimlane;startSize=30;horizontal=1;childLayout=stackLayout;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;swimlaneFillColor=#FFFFFF;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;" value="Quản trị viên" vertex="1">
+          <mxGeometry height="800" width="240" x="-550" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_sys" parent="1" style="swimlane;startSize=30;horizontal=1;childLayout=stackLayout;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;swimlaneFillColor=#FFFFFF;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;" value="Hệ thống" vertex="1">
+          <mxGeometry height="800" width="520" x="-310" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="start" parent="1" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+          <mxGeometry height="24" width="24" x="-452" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="act_list" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Truy cập danh sách lịch làm việc" vertex="1">
+          <mxGeometry height="36" width="200" x="-540" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="act_select" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Chọn lịch cần xóa" vertex="1">
+          <mxGeometry height="36" width="200" x="-540" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="act_confirm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Nhấn &#39;Xóa&#39; và xác nhận" vertex="1">
+          <mxGeometry height="36" width="200" x="-540" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="decision_confirm" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Xác nhận xóa?" vertex="1">
+          <mxGeometry height="40" width="220" x="-300" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_check" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#e6f7ff;strokeColor=#007acc;" value="Kiểm tra tồn tại (BR1)" vertex="1">
+          <mxGeometry height="40" width="200" x="-290" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="decision_exists" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Lịch tồn tại?" vertex="1">
+          <mxGeometry height="40" width="220" x="-300" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_delete" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#e6f7ff;strokeColor=#007acc;" value="Xóa dữ liệu khỏi CSDL" vertex="1">
+          <mxGeometry height="40" width="200" x="-290" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="decision_success" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Xóa thành công?" vertex="1">
+          <mxGeometry height="40" width="220" x="-300" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_success" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#e6f7ff;strokeColor=#007acc;" value="Thông báo xóa thành công" vertex="1">
+          <mxGeometry height="40" width="200" x="-290" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="err_cancel" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffd6d6;strokeColor=#cc0000;" value="Hủy thao tác xóa" vertex="1">
+          <mxGeometry height="40" width="180" x="20" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="err_notexist" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffd6d6;strokeColor=#cc0000;" value="Lỗi: Lịch không tồn tại" vertex="1">
+          <mxGeometry height="40" width="180" x="20" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="err_fail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffd6d6;strokeColor=#cc0000;" value="Lỗi: Xóa thất bại" vertex="1">
+          <mxGeometry height="40" width="180" x="20" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="end" parent="1" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+          <mxGeometry height="24" width="24" x="-202" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="start" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_list">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="act_list" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_select">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="act_select" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_confirm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="act_confirm" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="decision_confirm">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-300" y="248" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="decision_confirm" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#cc0000;" target="err_cancel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5b" edge="1" parent="1" source="err_cancel" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_list">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="decision_confirm" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="sys_check">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="sys_check" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="decision_exists">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="decision_exists" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#cc0000;" target="err_notexist">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8b" edge="1" parent="1" source="err_notexist" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_list">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="20" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="decision_exists" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="sys_delete">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="sys_delete" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="decision_success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="decision_success" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#cc0000;" target="err_fail">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11b" edge="1" parent="1" source="err_fail" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_confirm">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="decision_success" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="sys_success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="sys_success" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram name="UC10.1: Đăng ký tăng ca/làm chủ nhật" id="UC10_1_diag">
+    <mxGraphModel dx="2491" dy="924" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lane_emp" parent="1" style="swimlane;startSize=30;horizontal=1;childLayout=stackLayout;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;swimlaneFillColor=#FFFFFF;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;" value="Nhân viên" vertex="1">
+          <mxGeometry height="650" width="240" x="-550" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lane_sys" parent="1" style="swimlane;startSize=30;horizontal=1;childLayout=stackLayout;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=0;marginBottom=0;swimlaneFillColor=#FFFFFF;fontSize=12;fontStyle=1;fillColor=#FFFFFF;strokeColor=#000000;" value="Hệ thống" vertex="1">
+          <mxGeometry height="650" width="240" x="-310" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="start" parent="1" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+          <mxGeometry height="24" width="24" x="-452" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="act_open" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Truy cập trang đăng ký" vertex="1">
+          <mxGeometry height="36" width="160" x="-520" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="act_choose" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Chọn loại (Tăng ca / Chủ nhật)" vertex="1">
+          <mxGeometry height="36" width="200" x="-540" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="act_select_date" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Chọn ngày và nhập lý do" vertex="1">
+          <mxGeometry height="48" width="200" x="-540" y="268" as="geometry" />
+        </mxCell>
+        <mxCell id="act_submit" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Nhấn &#39;Gửi yêu cầu&#39;" vertex="1">
+          <mxGeometry height="36" width="160" x="-520" y="366" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_save" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#e6f7ff;strokeColor=#007acc;" value="Kiểm tra hợp lệ (BR1)" vertex="1">
+          <mxGeometry height="40" width="200" x="-290" y="406" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_store" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#e6f7ff;strokeColor=#007acc;" value="Lưu yêu cầu và đặt trạng thái&amp;nbsp;" vertex="1">
+          <mxGeometry height="48" width="200" x="-290" y="496" as="geometry" />
+        </mxCell>
+        <mxCell id="sys_error" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffd6d6;strokeColor=#cc0000;" value="Thông báo lỗi (ngày quá hạn / trùng yêu cầu)" vertex="1">
+          <mxGeometry height="48" width="180" x="-280" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="end" parent="1" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" value="" vertex="1">
+          <mxGeometry height="24" width="24" x="-202" y="606" as="geometry" />
+        </mxCell>
+        <mxCell id="decision" parent="1" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Ngày hợp lệ &amp; chưa đăng ký?" vertex="1">
+          <mxGeometry height="40" width="220" x="-300" y="332" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="start" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_open">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="act_open" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="qalCIM7Rr6mWArQdT47z-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="act_choose" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;" target="act_select_date">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="sys_error" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="act_choose">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="act_submit" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="decision">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-300" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="decision" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#cc0000;" target="sys_error">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="decision" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="sys_save">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="sys_save" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#007acc;" target="sys_store">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="sys_store" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-190" y="606" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="qalCIM7Rr6mWArQdT47z-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" value="Hệ thống hiển thị form tăng ca" vertex="1">
+          <mxGeometry height="48" width="200" x="-280" y="114" as="geometry" />
+        </mxCell>
+        <mxCell id="qalCIM7Rr6mWArQdT47z-3" edge="1" parent="1" source="qalCIM7Rr6mWArQdT47z-2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=open;strokeColor=#ff0000;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="act_choose">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-390" y="300" as="sourcePoint" />
+            <mxPoint x="-390" y="342" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

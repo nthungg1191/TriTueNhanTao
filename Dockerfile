@@ -6,7 +6,6 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
-        cmake \
         libopenblas-dev \
         liblapack-dev \
         libatlas3-base \
@@ -22,6 +21,7 @@ RUN apt-get update \
 
 COPY requirements.txt ./
 RUN pip install --upgrade pip \
+    && pip install cmake==3.27.7 \
     && pip install -r requirements.txt
 
 COPY . ./
