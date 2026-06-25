@@ -186,9 +186,33 @@
         gap: 8px;
     }
     .btn-sm {
-        padding: 6px 12px;
-        font-size: 12px;
+        padding: 8px 14px;
+        font-size: 13px;
         border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.3s;
+        white-space: nowrap;
+        display: inline-block;
+    }
+    .btn-danger {
+        background: #fff1f2;
+        color: #b91c1c;
+        border: 2px solid #b91c1c;
+    }
+    .btn-danger:hover {
+        background: #b91c1c;
+        color: white;
+    }
+    .btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 2px solid #cbd5e1;
+    }
+    .btn-secondary:hover {
+        background: #e2e8f0;
+        color: #1e293b;
     }
     .empty-state {
         text-align: center;
@@ -320,6 +344,115 @@
             font-size: 12px;
         }
     }
+    /* ===== Delete Confirm Modal ===== */
+    .delete-confirm-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+        font-family: inherit;
+    }
+    .delete-confirm-overlay.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+    .delete-confirm-card {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 36px 32px 28px;
+        max-width: 420px;
+        width: 90%;
+        box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18), 0 4px 16px rgba(0,0,0,0.08);
+        text-align: center;
+        transform: scale(0.88) translateY(12px);
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        font-family: inherit;
+    }
+    .delete-confirm-overlay.active .delete-confirm-card {
+        transform: scale(1) translateY(0);
+    }
+    .delete-confirm-icon {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #fee2e2, #fecaca);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+    }
+    .delete-confirm-icon svg {
+        width: 36px;
+        height: 36px;
+        color: #dc2626;
+    }
+    .delete-confirm-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 0 0 10px;
+    }
+    .delete-confirm-desc {
+        font-size: 14px;
+        color: #64748b;
+        margin: 0 0 6px;
+        line-height: 1.5;
+    }
+    .delete-confirm-info {
+        font-size: 14px;
+        color: #374151;
+        font-weight: 600;
+        margin: 0 0 28px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 16px;
+    }
+    .delete-confirm-actions {
+        display: flex;
+        gap: 12px;
+    }
+    .delete-confirm-actions .btn {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .delete-confirm-actions .btn-cancel {
+        background: #f1f5f9;
+        color: #475569;
+    }
+    .delete-confirm-actions .btn-cancel:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+        transform: translateY(-1px);
+    }
+    .delete-confirm-actions .btn-confirm {
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        color: white;
+        box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+    }
+    .delete-confirm-actions .btn-confirm:hover {
+        background: linear-gradient(135deg, #b91c1c, #991b1b);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(220, 38, 38, 0.45);
+    }
 </style>
 {% endblock %}
 
@@ -420,16 +553,7 @@
                                         {{ record.get_check_in_2_local() }}
                                     </div>
                                 {% endif %}
-                                {% if record.check_in_photo %}
-                                    <img src="{{ record.check_in_photo }}" 
-                                         alt="Check-in photo" 
-                                         class="photo-thumbnail"
-                                         onclick="showPhotoModal('{{ record.check_in_photo }}', 'Check-in: {{ record.get_check_in_local() }}')"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="photo-placeholder" style="display: none;">Ảnh lỗi</div>
-                                {% else %}
-                                    <div class="photo-placeholder">Không có ảnh</div>
-                                {% endif %}
+                                
                             </div>
                         </td>
                         <td>
@@ -446,16 +570,7 @@
                                         {{ record.get_check_out_2_local() }}
                                     </div>
                                 {% endif %}
-                                {% if record.check_out_photo %}
-                                    <img src="{{ record.check_out_photo }}" 
-                                         alt="Check-out photo" 
-                                         class="photo-thumbnail"
-                                         onclick="showPhotoModal('{{ record.check_out_photo }}', 'Check-out: {{ record.get_check_out_local() }}')"
-                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="photo-placeholder" style="display: none;">Ảnh lỗi</div>
-                                {% else %}
-                                    <div class="photo-placeholder">Không có ảnh</div>
-                                {% endif %}
+                               
                             </div>
                         </td>
                         <td>
@@ -499,14 +614,17 @@
                         <td>
                             <div class="btn-group">
                                 {% if record.id %}
-                                    <a href="{{ url_for('admin.attendance_edit', attendance_id=record.id) }}" 
-                                       class="btn btn-sm btn-secondary">✏️ Sửa</a>
-                                    <form method="POST" 
-                                          action="{{ url_for('admin.attendance_delete', attendance_id=record.id) }}" 
-                                          style="display: inline;"
-                                          onsubmit="return confirm('Bạn có chắc muốn xóa bản ghi chấm công này?');">
-                                        <button type="submit" class="btn btn-sm btn-danger">🗑️ Xóa</button>
-                                    </form>
+                                    <a href="{{ url_for('admin.attendance_detail', attendance_id=record.id) }}"
+                                       class="btn btn-sm btn-secondary"
+                                       style="background:#3b82f6;color:white;border:none;padding:6px 12px;border-radius:8px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+                                        Chi tiết
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger"
+                                            onclick="openDeleteModal(this)"
+                                            data-delete-url="{{ url_for('admin.attendance_delete', attendance_id=record.id) }}"
+                                            data-delete-info="{{ record.employee.employee_code if record.employee else 'N/A' }} - {{ record.employee.name if record.employee else 'N/A' }} | {{ record.date.strftime('%d/%m/%Y') }}">
+                                        🗑️ Xóa
+                                    </button>
                                 {% else %}
                                     <span style="color: #999; font-size: 12px;">Chưa chấm công</span>
                                 {% endif %}
@@ -520,10 +638,7 @@
             <div class="empty-state">
                 <div class="empty-state-icon">📭</div>
                 <h3>Không có dữ liệu chấm công</h3>
-                <p>Không tìm thấy bản ghi chấm công nào với bộ lọc hiện tại.</p>
-                <a href="{{ url_for('admin.attendance_new') }}" class="btn btn-primary" style="margin-top: 16px;">
-                    ➕ Thêm chấm công mới
-                </a>
+                <p>Bản ghi chấm công sẽ tự động được tạo khi duyệt yêu cầu bổ sung chấm công từ nhân viên.</p>
             </div>
             {% endif %}
         </div>
@@ -566,8 +681,49 @@ function closePhotoModal(event) {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closePhotoModal();
+        closeDeleteModal();
     }
 });
+
+/* ===== Delete Confirm Modal ===== */
+function openDeleteModal(btn) {
+    var info = btn.getAttribute('data-delete-info');
+    var action = btn.getAttribute('data-delete-url');
+    document.getElementById('deleteModalTitle').textContent = 'Xóa bản ghi chấm công';
+    document.getElementById('deleteModalDesc').textContent = 'Bạn có chắc chắn muốn xóa bản ghi chấm công này?';
+    document.getElementById('deleteModalInfo').textContent = info || '';
+    document.getElementById('deleteModalConfirm').textContent = 'Xóa bản ghi';
+    document.getElementById('deleteForm').action = action;
+    document.getElementById('deleteModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
 </script>
+
+<!-- Delete Confirm Modal -->
+<div class="delete-confirm-overlay" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="delete-confirm-card">
+        <div class="delete-confirm-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+        </div>
+        <h3 class="delete-confirm-title" id="deleteModalTitle">Xác nhận xóa</h3>
+        <p class="delete-confirm-desc" id="deleteModalDesc"></p>
+        <p class="delete-confirm-info" id="deleteModalInfo"></p>
+        <form id="deleteForm" method="POST" style="width: 100%;">
+            <div class="delete-confirm-actions">
+                <button type="button" class="btn btn-cancel" onclick="closeDeleteModal()">Hủy bỏ</button>
+                <button type="submit" class="btn btn-confirm" id="deleteModalConfirm">Xác nhận</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 

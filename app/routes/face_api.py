@@ -1,9 +1,9 @@
-
 import base64
 import binascii
 import io
 import logging
 import time
+import traceback
 import uuid
 from typing import Optional
 from flask import Blueprint, current_app, request, jsonify
@@ -361,7 +361,8 @@ def register_face_multi():
         if image is None:
             return jsonify({
                 'success': False,
-                'message': 'Dữ liệu ảnh không hợp lệ'
+                'message': 'Dữ liệu ảnh không hợp lệ',
+                'error_type': 'decode'
             }), 400
         
         face_service = FaceService(db.session)
@@ -370,10 +371,17 @@ def register_face_multi():
             return jsonify({'success': False, 'message': 'Face recognition service not available on this environment.'}), 500
         # Detect and encode face
         result_detect = face_detector.process_image(image)
-        if result_detect['faces_found'] != 1:
+        if result_detect['faces_found'] == 0:
             return jsonify({
                 'success': False,
-                'message': 'Ảnh phải chứa đúng một khuôn mặt'
+                'message': 'Không nhận diện được khuôn mặt. Hãy chụp lại với ánh sáng tốt hơn.',
+                'error_type': 'detect'
+            }), 400
+        if result_detect['faces_found'] > 1:
+            return jsonify({
+                'success': False,
+                'message': 'Ảnh có nhiều hơn 1 khuôn mặt. Vui lòng dùng ảnh chỉ có 1 khuôn mặt.',
+                'error_type': 'detect'
             }), 400
         
         face_encoding = result_detect['face_encodings'][0]
@@ -384,14 +392,10 @@ def register_face_multi():
             if recognition.get('success') and recognition.get('employee_code'):
                 matched_code = recognition['employee_code']
                 if matched_code != employee_code:
-                    matched_name = recognition.get('employee_name', matched_code)
                     return jsonify({
                         'success': False,
-                        'message': (
-                            f'Khuôn mặt này đã thuộc về nhân viên '
-                            f'"{matched_name}" ({matched_code}). '
-                            f'Không thể đăng ký cho nhân viên khác.'
-                        )
+                        'message': 'Đã có face trong hệ thống',
+                        'error_type': 'duplicate'
                     }), 409
         except Exception:
             pass  # If recognition check fails, proceed with registration
@@ -408,13 +412,15 @@ def register_face_multi():
         if result['success']:
             return jsonify(result), 200
         else:
+            result['error_type'] = 'embedding'
             return jsonify(result), 400
             
     except Exception as e:
-        logger.error(f"lỗi đăng ký khuôn mặt: {str(e)}")
+        logger.error(f"lỗi đăng ký khuôn mặt: {str(e)}\n{traceback.format_exc()}")
         return jsonify({
             'success': False,
-            'message': f'Đăng ký thất bại: {str(e)}'
+            'message': f'Đăng ký thất bại: {str(e)}',
+            'error_type': 'unknown'
         }), 500
 
 

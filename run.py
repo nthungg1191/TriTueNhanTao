@@ -25,7 +25,7 @@ _restart_inside_local_venv()
 
 from flask import redirect, url_for
 from app import create_app, db
-from app.models import User, Employee, Attendance, SystemLog
+from app.models import User, Employee, Attendance, SystemLog, OvertimeRequest, LeaveRequest, AttendanceCorrectionRequest
 
 # Get configuration from environment
 config_name = os.getenv('FLASK_ENV', 'development')
@@ -61,7 +61,10 @@ def make_shell_context():
         'User': User,
         'Employee': Employee,
         'Attendance': Attendance,
-        'SystemLog': SystemLog
+        'SystemLog': SystemLog,
+        'OvertimeRequest': OvertimeRequest,
+        'LeaveRequest': LeaveRequest,
+        'AttendanceCorrectionRequest': AttendanceCorrectionRequest,
     }
 
 

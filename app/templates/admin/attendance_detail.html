@@ -1,0 +1,685 @@
+{% extends 'layouts/admin_base.html' %}
+
+{% block title %}Chi tiết chấm công{% endblock %}
+
+{% block content %}
+<style>
+    /* ─── Layout shell ─── */
+    .detail-wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding-bottom: 40px;
+    }
+
+    /* ─── Employee hero strip ─── */
+    .hero-strip {
+        background: white;
+        border-radius: 16px;
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+        border: 1px solid #f1f5f9;
+    }
+    .hero-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 22px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(99,102,241,0.35);
+    }
+    .hero-info { flex: 1; }
+    .hero-name { font-size: 18px; font-weight: 800; color: #1e293b; }
+    .hero-meta { font-size: 13px; color: #64748b; margin-top: 3px; }
+    .hero-meta span { font-weight: 600; color: #334155; }
+
+    /* ─── KPI row ─── */
+    .kpi-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+    .kpi-card {
+        background: white;
+        border-radius: 14px;
+        padding: 18px 16px;
+        text-align: center;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+        transition: transform 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); }
+    .kpi-num {
+        font-size: 26px;
+        font-weight: 800;
+        color: #1e293b;
+        line-height: 1;
+    }
+    .kpi-lbl {
+        font-size: 11px;
+        font-weight: 700;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-top: 6px;
+    }
+    .kpi-card.kpi-date { border-top: 3px solid #6366f1; }
+    .kpi-card.kpi-work { border-top: 3px solid #10b981; }
+    .kpi-card.kpi-ot   { border-top: 3px solid #f59e0b; }
+    .kpi-card.kpi-total{ border-top: 3px solid #14b8a6; }
+
+    /* ─── Section heading ─── */
+    .section-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    .section-head h2 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #334155;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .section-head .line {
+        flex: 1;
+        height: 1px;
+        background: #f1f5f9;
+    }
+
+    /* ─── Timeline (check-in / out cards) ─── */
+    .timeline-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+    .time-card {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+    }
+    .time-card-header {
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .time-card-header .icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+    .time-card-header .badge {
+        margin-left: auto;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .time-card-body { padding: 0 20px 18px; }
+
+    .punch-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f8fafc;
+    }
+    .punch-row:last-child { border-bottom: none; }
+    .punch-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        flex-shrink: 0;
+    }
+    .punch-icon.in  { background: #ecfdf5; }
+    .punch-icon.out { background: #fef3c7; }
+    .punch-label { font-size: 12px; color: #94a3b8; font-weight: 600; }
+    .punch-time  { font-size: 15px; font-weight: 700; color: #1e293b; font-family: 'JetBrains Mono', monospace; margin-top: 2px; }
+    .punch-time.missing { color: #ef4444; }
+
+    /* ─── OT card ─── */
+    .ot-card {
+        background: white;
+        border-radius: 16px;
+        border: 1px solid #fde68a;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+    }
+    .ot-header {
+        background: #fffbeb;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #92400e;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .ot-body { padding: 12px 20px 18px; }
+    .ot-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+    }
+    .ot-item { text-align: center; }
+    .ot-item .lbl { font-size: 11px; color: #92400e; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .ot-item .val { font-size: 16px; font-weight: 800; color: #1e293b; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+    .ot-item .val.missing { color: #ef4444; }
+
+    /* ─── Shift status strip ─── */
+    .shift-strip {
+        background: white;
+        border-radius: 16px;
+        padding: 18px 24px;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+    }
+    .shift-items {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+    .shift-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .shift-pill .sl { font-size: 11px; font-weight: 600; opacity: 0.7; }
+    .shift-pill.on_time  { background: #ecfdf5; color: #166534; }
+    .shift-pill.late     { background: #fef3c7; color: #92400e; }
+    .shift-pill.early    { background: #fef3c7; color: #92400e; }
+    .shift-pill.missing  { background: #fee2e2; color: #991b1b; }
+    .shift-pill.na       { background: #f1f5f9; color: #94a3b8; }
+
+    /* ─── Status badge (overall) ─── */
+    .status-badge {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .status-badge.on_time  { background: #ecfdf5; color: #166534; }
+    .status-badge.late    { background: #fef3c7; color: #92400e; }
+    .status-badge.missing { background: #fee2e2; color: #991b1b; }
+    .status-badge.na      { background: #f1f5f9; color: #94a3b8; }
+
+    /* ─── Photos ─── */
+    .photos-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+    }
+    .photo-tile {
+        background: white;
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 2px 12px rgba(15,23,42,0.05);
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .photo-tile:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+    }
+    .photo-tile img {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        display: block;
+    }
+    .photo-tile-caption {
+        padding: 10px 12px;
+        text-align: center;
+    }
+    .photo-tile-placeholder {
+        width: 100%;
+        aspect-ratio: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #f8fafc;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .photo-tile-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .photo-tile-time {
+        font-size: 10px;
+        color: #94a3b8;
+        font-family: 'JetBrains Mono', monospace;
+        margin-top: 2px;
+    }
+
+    /* ─── Notes ─── */
+    .notes-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 18px;
+        font-size: 13px;
+        color: #475569;
+        line-height: 1.6;
+    }
+    .notes-box strong { color: #334155; }
+
+    /* ─── Photo modal ─── */
+    .photo-modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0; top: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.88);
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.2s;
+    }
+    .photo-modal.active { display: flex; }
+    .photo-modal-content { position: relative; }
+    .photo-modal-content img {
+        max-width: 90vw;
+        max-height: 85vh;
+        border-radius: 12px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        animation: zoomIn 0.2s;
+    }
+    .photo-modal-caption {
+        text-align: center;
+        color: rgba(255,255,255,0.85);
+        font-size: 14px;
+        font-weight: 500;
+        margin-top: 12px;
+    }
+    .photo-modal-close {
+        position: fixed;
+        top: 20px; right: 24px;
+        width: 40px; height: 40px;
+        background: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        color: white;
+        cursor: pointer;
+        transition: background 0.2s;
+        line-height: 1;
+    }
+    .photo-modal-close:hover { background: rgba(255,255,255,0.3); }
+
+    /* ─── Back button ─── */
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        background: white;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 999px;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+    }
+    .back-btn:hover {
+        background: #6366f1;
+        border-color: #6366f1;
+        color: white;
+        box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+        transform: translateY(-1px);
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoomIn { from { transform: scale(0.92); } to { transform: scale(1); } }
+</style>
+
+<div class="detail-wrap">
+
+    <!-- ── Hero strip ── -->
+    <div class="hero-strip">
+        <div class="hero-avatar">
+            {{ employee.name.split()[-1][0] if employee.name else '?' }}
+        </div>
+        <div class="hero-info">
+            <div class="hero-name">{{ employee.name }}</div>
+            <div class="hero-meta">
+                Mã NV: <span>{{ employee.employee_code }}</span>
+                {% if employee.department %}
+                    &nbsp;&middot;&nbsp; Phòng: <span>{{ employee.department }}</span>
+                {% endif %}
+                &nbsp;&middot;&nbsp;
+                <span class="status-badge
+                    {% if attendance.status == 'present' %}on_time{% endif %}
+                    {% if attendance.status in ['late','early_leave'] %}late{% endif %}
+                    {% if attendance.status == 'absent' %}missing{% endif %}
+                    {% if attendance.status in ['missing_check_in','missing_check_out','missed_overtime','missed_sunday_work'] %}missing{% endif %}">
+                    {{ attendance.STATUS_LABELS.get(attendance.status, attendance.status) }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── KPI row ── -->
+    <div class="kpi-row">
+        <div class="kpi-card kpi-date">
+            <div class="kpi-num">{{ attendance.date.strftime('%d/%m/%Y') }}</div>
+            <div class="kpi-lbl">Ngày chấm công</div>
+        </div>
+        <div class="kpi-card kpi-work">
+            <div class="kpi-num">{{ '%.2f'|format(attendance.working_hours or 0) }}</div>
+            <div class="kpi-lbl">Công chính</div>
+        </div>
+        <div class="kpi-card kpi-ot">
+            <div class="kpi-num">{{ '%.2f'|format(attendance.overtime_hours or 0) }}</div>
+            <div class="kpi-lbl">Công tăng ca</div>
+        </div>
+        <div class="kpi-card kpi-total">
+            <div class="kpi-num">{{ '%.2f'|format((attendance.working_hours or 0) + (attendance.overtime_hours or 0)) }}</div>
+            <div class="kpi-lbl">Tổng công</div>
+        </div>
+    </div>
+
+    <!-- ── Timeline: Ca sáng & Ca chiều ── -->
+    <div class="timeline-grid">
+
+        <!-- Ca sáng -->
+        <div class="time-card">
+            <div class="time-card-header" style="background:#f0fdf4;color:#166534;">
+                <div class="icon" style="background:#bbf7d0;">
+                    <svg width="16" height="16" fill="none" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                </div>
+                Ca sáng
+                <span class="badge
+                    {% if shift_breakdown.morning == 'on_time' %}on_time{% elif shift_breakdown.morning == 'late' %}late{% elif shift_breakdown.morning == 'missing' %}missing{% else %}na{% endif %}">
+                    {{ shift_labels.morning }}
+                </span>
+            </div>
+            <div class="time-card-body">
+                <div class="punch-row">
+                    <div class="punch-icon in">
+                        <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                    <div>
+                        <div class="punch-label">Check-in sáng</div>
+                        <div class="punch-time {% if not attendance.check_in_time %}missing{% endif %}">
+                            {{ attendance.get_check_in_local() if attendance.check_in_time else '--:--:--' }}
+                        </div>
+                    </div>
+                </div>
+                <div class="punch-row">
+                    <div class="punch-icon out">
+                        <svg width="16" height="16" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                    <div>
+                        <div class="punch-label">Check-out sáng</div>
+                        <div class="punch-time {% if not attendance.check_out_time %}missing{% endif %}">
+                            {{ attendance.get_check_out_local() if attendance.check_out_time else '--:--:--' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ca chiều -->
+        <div class="time-card">
+            <div class="time-card-header" style="background:#eff6ff;color:#1d4ed8;">
+                <div class="icon" style="background:#bfdbfe;">
+                    <svg width="16" height="16" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+                </div>
+                Ca chiều
+                <span class="badge
+                    {% if shift_breakdown.afternoon == 'on_time' %}on_time{% elif shift_breakdown.afternoon == 'late' %}late{% elif shift_breakdown.afternoon == 'missing' %}missing{% else %}na{% endif %}">
+                    {{ shift_labels.afternoon }}
+                </span>
+            </div>
+            <div class="time-card-body">
+                <div class="punch-row">
+                    <div class="punch-icon in">
+                        <svg width="16" height="16" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                    <div>
+                        <div class="punch-label">Check-in chiều</div>
+                        <div class="punch-time {% if not attendance.check_in_time_2 %}missing{% endif %}">
+                            {{ attendance.get_check_in_2_local() if attendance.check_in_time_2 else '--:--:--' }}
+                        </div>
+                    </div>
+                </div>
+                <div class="punch-row">
+                    <div class="punch-icon out">
+                        <svg width="16" height="16" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                    <div>
+                        <div class="punch-label">Check-out chiều</div>
+                        <div class="punch-time {% if not attendance.check_out_time_2 %}missing{% endif %}">
+                            {{ attendance.get_check_out_2_local() if attendance.check_out_time_2 else '--:--:--' }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── Overtime ── -->
+    {% if attendance.overtime_check_in_time or attendance.overtime_check_out_time %}
+    <div class="ot-card">
+        <div class="ot-header">
+            <svg width="16" height="16" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Tăng ca
+        </div>
+        <div class="ot-body">
+            <div class="ot-grid">
+                <div class="ot-item">
+                    <div class="lbl">Check-in OT</div>
+                    <div class="val {% if not attendance.overtime_check_in_time %}missing{% endif %}">
+                        {{ attendance.get_ot_check_in_local() if attendance.overtime_check_in_time else '--:--:--' }}
+                    </div>
+                </div>
+                <div class="ot-item">
+                    <div class="lbl">Check-out OT</div>
+                    <div class="val {% if not attendance.overtime_check_out_time %}missing{% endif %}">
+                        {{ attendance.get_ot_check_out_local() if attendance.overtime_check_out_time else '--:--:--' }}
+                    </div>
+                </div>
+                <div class="ot-item">
+                    <div class="lbl">Công OT</div>
+                    <div class="val">{{ '%.2f'|format(attendance.overtime_hours or 0) }} điểm</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Shift status ── -->
+    <div class="shift-strip">
+        <div class="section-head">
+            <h2>Trạng thái các mốc</h2>
+            <div class="line"></div>
+        </div>
+        <div class="shift-items">
+            <div class="shift-pill {% if shift_breakdown.morning == 'on_time' %}on_time{% elif shift_breakdown.morning == 'late' %}late{% elif shift_breakdown.morning == 'missing' %}missing{% else %}na{% endif %}">
+                <span class="sl">Sáng</span>
+                {{ shift_labels.morning }}
+            </div>
+            <div class="shift-pill {% if shift_breakdown.lunch == 'on_time' %}on_time{% elif shift_breakdown.lunch == 'early' %}early{% elif shift_breakdown.lunch == 'missing' %}missing{% else %}na{% endif %}">
+                <span class="sl">Nghỉ trưa</span>
+                {{ shift_labels.lunch }}
+            </div>
+            <div class="shift-pill {% if shift_breakdown.afternoon == 'on_time' %}on_time{% elif shift_breakdown.afternoon == 'late' %}late{% elif shift_breakdown.afternoon == 'missing' %}missing{% else %}na{% endif %}">
+                <span class="sl">Chiều</span>
+                {{ shift_labels.afternoon }}
+            </div>
+            <div class="shift-pill {% if shift_breakdown.final == 'on_time' %}on_time{% elif shift_breakdown.final == 'early' %}early{% elif shift_breakdown.final == 'missing' %}missing{% else %}na{% endif %}">
+                <span class="sl">Tan ca</span>
+                {{ shift_labels.final }}
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Photos ── -->
+    {% if attendance.check_in_photo or attendance.check_out_photo or attendance.check_in_photo_2 or attendance.check_out_photo_2 %}
+    <div>
+        <div class="section-head">
+            <h2>Ảnh chấm công</h2>
+            <div class="line"></div>
+        </div>
+        <div class="photos-grid">
+            {% if attendance.check_in_photo %}
+            <div class="photo-tile">
+                <img src="{{ attendance.check_in_photo }}" alt="Check-in sáng"
+                     onclick="showPhotoModal(this.src, 'Check-in sáng')"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="photo-tile-placeholder" style="display:none;">
+                    <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Không có ảnh</span>
+                </div>
+                <div class="photo-tile-caption">
+                    <div class="photo-tile-label">Check-in sáng</div>
+                    <div class="photo-tile-time">{{ attendance.get_check_in_local() if attendance.check_in_time else '--' }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if attendance.check_out_photo %}
+            <div class="photo-tile">
+                <img src="{{ attendance.check_out_photo }}" alt="Check-out sáng"
+                     onclick="showPhotoModal(this.src, 'Check-out sáng')"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="photo-tile-placeholder" style="display:none;">
+                    <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Không có ảnh</span>
+                </div>
+                <div class="photo-tile-caption">
+                    <div class="photo-tile-label">Check-out sáng</div>
+                    <div class="photo-tile-time">{{ attendance.get_check_out_local() if attendance.check_out_time else '--' }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if attendance.check_in_photo_2 %}
+            <div class="photo-tile">
+                <img src="{{ attendance.check_in_photo_2 }}" alt="Check-in chiều"
+                     onclick="showPhotoModal(this.src, 'Check-in chiều')"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="photo-tile-placeholder" style="display:none;">
+                    <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Không có ảnh</span>
+                </div>
+                <div class="photo-tile-caption">
+                    <div class="photo-tile-label">Check-in chiều</div>
+                    <div class="photo-tile-time">{{ attendance.get_check_in_2_local() if attendance.check_in_time_2 else '--' }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% if attendance.check_out_photo_2 %}
+            <div class="photo-tile">
+                <img src="{{ attendance.check_out_photo_2 }}" alt="Check-out chiều"
+                     onclick="showPhotoModal(this.src, 'Check-out chiều')"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="photo-tile-placeholder" style="display:none;">
+                    <svg width="32" height="32" fill="none" stroke="#cbd5e1" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Không có ảnh</span>
+                </div>
+                <div class="photo-tile-caption">
+                    <div class="photo-tile-label">Check-out chiều</div>
+                    <div class="photo-tile-time">{{ attendance.get_check_out_2_local() if attendance.check_out_time_2 else '--' }}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Notes ── -->
+    {% if attendance.notes %}
+    <div>
+        <div class="section-head">
+            <h2>Ghi chú</h2>
+            <div class="line"></div>
+        </div>
+        <div class="notes-box">{{ attendance.notes }}</div>
+    </div>
+    {% endif %}
+
+    <!-- ── Back ── -->
+    <div style="text-align:center;padding-top:8px;">
+        <a href="{{ url_for('admin.attendance') }}" class="back-btn">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            Quay lại danh sách chấm công
+        </a>
+    </div>
+
+</div><!-- /.detail-wrap -->
+
+<!-- Photo Modal -->
+<div id="photoModal" class="photo-modal" onclick="if(event.target===this)closePhotoModal()">
+    <div class="photo-modal-close" onclick="closePhotoModal()">&times;</div>
+    <div class="photo-modal-content">
+        <img id="modalPhoto" src="" alt="Attendance photo">
+        <div class="photo-modal-caption" id="modalPhotoCaption"></div>
+    </div>
+</div>
+
+<script>
+function showPhotoModal(photoSrc, caption) {
+    document.getElementById('modalPhoto').src = photoSrc;
+    document.getElementById('modalPhotoCaption').textContent = caption;
+    document.getElementById('photoModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closePhotoModal() {
+    document.getElementById('photoModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePhotoModal();
+});
+</script>
+
+{% endblock %}

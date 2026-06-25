@@ -42,6 +42,8 @@ class Attendance(db.Model):
         'early_leave': 'Nghỉ sớm',
         'missing_check_in': 'Thiếu check-in',
         'missing_check_out': 'Thiếu check-out',
+        'missed_overtime': 'Tăng ca - Không chấm công',
+        'missed_sunday_work': 'Làm Chủ nhật - Không chấm công',
     }
 
     SHIFT_LABELS = {
@@ -240,6 +242,13 @@ class Attendance(db.Model):
         except Exception:
             return None
 
+    def _is_sunday_work_day(self):
+        """Return True if the approved OvertimeRequest is a Sunday work registration."""
+        req = self._get_approved_overtime_request()
+        if not req:
+            return False
+        return req.date.weekday() == 6 and req.hours >= 7.5
+
     def _calculate_overtime_deductions(self):
         """Calculate OT deductions using the approved OT time window."""
         total_deduction = 0.0
@@ -337,6 +346,14 @@ class Attendance(db.Model):
 
         # Missing punches handling
         if not self.check_in_time and not self.check_out_time and not self.check_in_time_2 and not self.check_out_time_2:
+            # Nếu có đăng ký tăng ca/làm Chủ nhật đã duyệt nhưng không chấm công tăng ca
+            approved_ot = self._get_approved_overtime_request()
+            if approved_ot and not self.overtime_check_in_time:
+                if self._is_sunday_work_day():
+                    self.status = 'missed_sunday_work'
+                else:
+                    self.status = 'missed_overtime'
+                return
             self.status = 'absent'
             return
 

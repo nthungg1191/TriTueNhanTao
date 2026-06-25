@@ -286,8 +286,13 @@ def reject_correction(request_id: int):
     return redirect(url_for('admin.requests'))
 
 
-def _save_employee_photo(file_storage):
-    """Save employee photo and return (photo_path, image_array, error_message)."""
+def _validate_employee_photo(file_storage, employee_code: str = None):
+    """Validate uploaded photo for face detection and duplicate check. No file I/O.
+
+    Returns (image, face_encoding, error_message).
+    image is always returned (even if face check skipped) so caller can pass it to
+    _register_face_from_employee_photo.
+    """
     if not file_storage or not getattr(file_storage, 'filename', ''):
         return None, None, None
 
@@ -300,23 +305,72 @@ def _save_employee_photo(file_storage):
     if image is None:
         return None, None, 'Không thể đọc ảnh nhân viên. Vui lòng chọn ảnh hợp lệ.'
 
+    if employee_code:
+        from app.services.face_detection import FaceDetector
+        from app.services.face_service import FaceService
+
+        detector = FaceDetector()
+        detect_result = detector.process_image(image)
+
+        if detect_result['faces_found'] == 0:
+            return image, None, 'Không tìm thấy khuôn mặt. Hãy chụp lại với ánh sáng tốt hơn.'
+
+        if detect_result['faces_found'] > 1:
+            return image, None, 'Ảnh có nhiều hơn 1 khuôn mặt. Vui lòng dùng ảnh chỉ có 1 khuôn mặt.'
+
+        face_encoding = detect_result['face_encodings'][0]
+        face_service = FaceService(db.session)
+
+        try:
+            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+            if recognition.get('success') and recognition.get('employee_code'):
+                matched_code = recognition['employee_code']
+                if matched_code != employee_code:
+                    return image, None, 'Đã có face trong hệ thống'
+        except Exception:
+            pass
+
+        return image, face_encoding, None
+
+    return image, None, None
+
+
+def _save_photo_to_disk(image, filename: str = None):
+    """Save validated image array to disk. Returns (photo_path, full_path, error)."""
+    if image is None:
+        return None, None, 'Không có ảnh để lưu.'
+
     upload_dir = os.path.join(current_app.config['UPLOAD_PATH'], 'employees')
     os.makedirs(upload_dir, exist_ok=True)
 
-    filename = f"employee_{uuid.uuid4().hex}.jpg"
+    if filename is None:
+        filename = f"employee_{uuid.uuid4().hex}.jpg"
     full_path = os.path.join(upload_dir, filename)
-    cv2.imwrite(full_path, image)
+    saved = cv2.imwrite(full_path, image)
+    if not saved:
+        return None, None, 'Không thể lưu ảnh xuống đĩa.'
 
-    return f"/static/uploads/employees/{filename}", image, None
+    photo_path = f"/static/uploads/employees/{filename}"
+    return photo_path, full_path, None
 
 
-def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, photo_path: str = None, skip_employee_code: str = None):
+def _cleanup_photo(full_path: str):
+    """Delete saved photo file from disk."""
+    if full_path and os.path.isfile(full_path):
+        try:
+            os.remove(full_path)
+        except OSError:
+            pass
+
+
+def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, photo_path: str = None, skip_employee_code: str = None, face_encoding=None):
     """Generate face encoding from employee photo and upsert embeddings.
 
     Args:
         skip_employee_code: When set, exclude this employee_code from the
             duplicate-face check (used during employee edit to allow re-uploading
             the same person's photo).
+        face_encoding: Pre-detected face encoding (to avoid duplicate detection).
     """
     try:
         from app.services.face_detection import FaceDetector
@@ -324,16 +378,18 @@ def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, ph
     except Exception as e:
         return False, f'Không thể khởi tạo dịch vụ nhận diện: {e}'
 
-    detector = FaceDetector()
-    detect_result = detector.process_image(image)
+    if face_encoding is None:
+        detector = FaceDetector()
+        detect_result = detector.process_image(image)
 
-    if detect_result['faces_found'] == 0:
-        return False, 'Ảnh nhân viên không có khuôn mặt nên chưa thể bật nhận diện chấm công.'
+        if detect_result['faces_found'] == 0:
+            return False, 'Ảnh nhân viên không có khuôn mặt nên chưa thể bật nhận diện chấm công.'
 
-    if detect_result['faces_found'] > 1:
-        return False, 'Ảnh nhân viên có nhiều khuôn mặt. Vui lòng dùng ảnh chỉ có 1 khuôn mặt.'
+        if detect_result['faces_found'] > 1:
+            return False, 'Ảnh nhân viên có nhiều khuôn mặt. Vui lòng dùng ảnh chỉ có 1 khuôn mặt.'
 
-    face_encoding = detect_result['face_encodings'][0]
+        face_encoding = detect_result['face_encodings'][0]
+
     face_service = FaceService(db.session)
 
     # --- Duplicate face check ---
@@ -342,12 +398,7 @@ def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, ph
         if recognition.get('success') and recognition.get('employee_code'):
             matched_code = recognition['employee_code']
             if matched_code != employee_code:
-                matched_name = recognition.get('employee_name', matched_code)
-                return False, (
-                    f'Khuôn mặt này đã thuộc về nhân viên '
-                    f'"{matched_name}" ({matched_code}). '
-                    f'Không thể đăng ký cho nhân viên khác.'
-                )
+                return False, 'Đã có face trong hệ thống'
             # matched_code == employee_code → same employee, allowed
     except Exception:
         pass  # If recognition check fails, proceed with registration
@@ -446,6 +497,27 @@ def _parse_local_datetime(value):
         return to_local(dt)
     except ValueError:
         return None
+
+
+def _validate_attendance_punch_times(check_in_time, check_out_time, check_in_time_2, check_out_time_2,
+                                      overtime_check_in_time, overtime_check_out_time):
+    """Validate logical ordering of punch times. Returns error message or None."""
+    if check_in_time and check_out_time and check_out_time <= check_in_time:
+        return 'Giờ check-out buổi sáng phải sau giờ check-in buổi sáng'
+
+    if check_out_time and check_in_time_2 and check_in_time_2 <= check_out_time:
+        return 'Giờ check-in buổi chiều phải sau giờ check-out buổi sáng (nghỉ trưa)'
+
+    if check_in_time_2 and check_out_time_2 and check_out_time_2 <= check_in_time_2:
+        return 'Giờ check-out buổi chiều phải sau giờ check-in buổi chiều'
+
+    if check_out_time_2 and overtime_check_in_time and overtime_check_in_time <= check_out_time_2:
+        return 'Giờ check-in tăng ca phải sau giờ tan ca buổi chiều'
+
+    if overtime_check_in_time and overtime_check_out_time and overtime_check_out_time <= overtime_check_in_time:
+        return 'Giờ check-out tăng ca phải sau giờ check-in tăng ca'
+
+    return None
 
 
 @bp.before_request
@@ -650,17 +722,30 @@ def employee_new():
             _sync_employee_user(emp, password=password if password else emp.employee_code.lower())
 
             photo_file = request.files.get('photo')
-            photo_path, image, photo_error = _save_employee_photo(photo_file)
-            if photo_error:
-                flash(f'Nhân viên đã tạo nhưng ảnh chưa hợp lệ: {photo_error}', 'warning')
-                return redirect(url_for('admin.employee_edit', employee_id=emp.id))
+            if photo_file and getattr(photo_file, 'filename', ''):
+                image, face_encoding, validate_error = _validate_employee_photo(photo_file, employee_code=emp.employee_code)
+                if validate_error:
+                    flash(validate_error, 'warning')
+                    return redirect(url_for('admin.employee_edit', employee_id=emp.id))
 
-            if photo_path and image is not None:
+                photo_path, full_path, save_error = _save_photo_to_disk(image)
+                if save_error:
+                    flash(save_error, 'warning')
+                    return redirect(url_for('admin.employee_edit', employee_id=emp.id))
+
                 emp.photo_path = photo_path
                 db.session.commit()
 
-                face_ok, face_message = _register_face_from_employee_photo(emp.employee_code, image, photo_path)
-                flash(face_message, 'success' if face_ok else 'warning')
+                try:
+                    face_ok, face_message = _register_face_from_employee_photo(
+                        emp.employee_code, image, photo_path, face_encoding=face_encoding)
+                    flash(face_message, 'success' if face_ok else 'warning')
+                except Exception as e:
+                    _cleanup_photo(full_path)
+                    db.session.rollback()
+                    flash(f'Lỗi khi lưu face encoding: {e}. Ảnh đã được xóa.', 'danger')
+                    return redirect(url_for('admin.employee_edit', employee_id=emp.id))
+
                 return redirect(url_for('admin.employee_edit', employee_id=emp.id))
 
             if password:
@@ -800,17 +885,29 @@ def employee_edit(employee_id: int):
         _sync_employee_user(emp, password=password or None, old_username=old_employee_code)
 
         photo_file = request.files.get('photo')
-        photo_path, image, photo_error = _save_employee_photo(photo_file)
-        if photo_error:
-            flash(f'Đã cập nhật nhân viên nhưng ảnh chưa hợp lệ: {photo_error}', 'warning')
-            return redirect(url_for('admin.employee_edit', employee_id=emp.id))
+        if photo_file and getattr(photo_file, 'filename', ''):
+            image, face_encoding, validate_error = _validate_employee_photo(photo_file, employee_code=emp.employee_code)
+            if validate_error:
+                flash(validate_error, 'warning')
+                return redirect(url_for('admin.employee_edit', employee_id=emp.id))
 
-        if photo_path and image is not None:
+            photo_path, full_path, save_error = _save_photo_to_disk(image)
+            if save_error:
+                flash(save_error, 'warning')
+                return redirect(url_for('admin.employee_edit', employee_id=emp.id))
+
             emp.photo_path = photo_path
             db.session.commit()
 
-            face_ok, face_message = _register_face_from_employee_photo(emp.employee_code, image, photo_path, skip_employee_code=emp.employee_code)
-            flash(face_message, 'success' if face_ok else 'warning')
+            try:
+                face_ok, face_message = _register_face_from_employee_photo(
+                    emp.employee_code, image, photo_path, face_encoding=face_encoding)
+                flash(face_message, 'success' if face_ok else 'warning')
+            except Exception as e:
+                _cleanup_photo(full_path)
+                db.session.rollback()
+                flash(f'Lỗi khi lưu face encoding: {e}. Ảnh đã được xóa.', 'danger')
+                return redirect(url_for('admin.employee_edit', employee_id=emp.id))
 
         flash('Cập nhật nhân viên thành công.', 'success')
         return redirect(url_for('admin.employees'))
@@ -836,9 +933,12 @@ def employee_delete(employee_id: int):
         from app.models.face_embedding import FaceEmbedding
         FaceEmbedding.query.filter_by(employee_id=emp.id).update({'is_active': False})
 
+        # Deactivate work schedules for this employee
+        WorkSchedule.query.filter_by(employee_id=emp.id).update({'is_active': False})
+
         db.session.commit()
 
-        flash(f'Đã ẩn nhân viên {employee_code}', 'success')
+        flash(f'Đã xóa nhân viên {employee_code}', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'❌ Lỗi xóa nhân viên: {str(e)}', 'danger')
@@ -856,8 +956,8 @@ def schedules():
     employee_id_filter = request.args.get('employee_id', type=int)
     is_active_filter = request.args.get('is_active')
     
-    # Build query
-    query = WorkSchedule.query
+    # Build query - only show active schedules by default
+    query = WorkSchedule.query.filter_by(is_active=True)
     
     if employee_id_filter:
         query = query.filter_by(employee_id=employee_id_filter)
@@ -1261,7 +1361,7 @@ def attendance_new():
         if existing:
             flash('Bản ghi chấm công cho nhân viên này trong ngày này đã tồn tại. Vui lòng sửa bản ghi hiện có.', 'warning')
             return redirect(url_for('admin.attendance_edit', attendance_id=existing.id))
-        
+
         # Get check-in/out times (parse as local timezone)
         check_in_time = _parse_local_datetime(request.form.get('check_in_time'))
         check_out_time = _parse_local_datetime(request.form.get('check_out_time'))
@@ -1269,7 +1369,19 @@ def attendance_new():
         check_out_time_2 = _parse_local_datetime(request.form.get('check_out_time_2'))
         overtime_check_in_time = _parse_local_datetime(request.form.get('overtime_check_in_time'))
         overtime_check_out_time = _parse_local_datetime(request.form.get('overtime_check_out_time'))
-        
+
+        # Validate logical ordering of punch times
+        punch_error = _validate_attendance_punch_times(
+            check_in_time, check_out_time, check_in_time_2, check_out_time_2,
+            overtime_check_in_time, overtime_check_out_time
+        )
+        if punch_error:
+            flash(punch_error, 'danger')
+            employees = Employee.query.filter_by(is_active=True).order_by(Employee.name).all()
+            return render_template('admin/attendance_form.html',
+                                 employees=employees,
+                                 today=date.today())
+
         # Get status
         status = request.form.get('status', 'present').strip()
         
@@ -1381,11 +1493,11 @@ def attendance_edit(attendance_id: int):
         if existing:
             flash('Bản ghi chấm công cho nhân viên này trong ngày này đã tồn tại', 'warning')
             employees = Employee.query.filter_by(is_active=True).order_by(Employee.name).all()
-            return render_template('admin/attendance_form.html', 
+            return render_template('admin/attendance_form.html',
                                  attendance=attendance,
                                  employees=employees,
                                  today=date.today())
-        
+
         # Get check-in/out times (parse as local timezone)
         check_in_time = _parse_local_datetime(request.form.get('check_in_time'))
         check_out_time = _parse_local_datetime(request.form.get('check_out_time'))
@@ -1393,17 +1505,30 @@ def attendance_edit(attendance_id: int):
         check_out_time_2 = _parse_local_datetime(request.form.get('check_out_time_2'))
         overtime_check_in_time = _parse_local_datetime(request.form.get('overtime_check_in_time'))
         overtime_check_out_time = _parse_local_datetime(request.form.get('overtime_check_out_time'))
-        
+
+        # Validate logical ordering of punch times
+        punch_error = _validate_attendance_punch_times(
+            check_in_time, check_out_time, check_in_time_2, check_out_time_2,
+            overtime_check_in_time, overtime_check_out_time
+        )
+        if punch_error:
+            flash(punch_error, 'danger')
+            employees = Employee.query.filter_by(is_active=True).order_by(Employee.name).all()
+            return render_template('admin/attendance_form.html',
+                                 attendance=attendance,
+                                 employees=employees,
+                                 today=date.today())
+
         # Get status
         status = request.form.get('status', 'present').strip()
-        
+
         # Get working hours
         working_hours = request.form.get('working_hours', '').strip()
         try:
             working_hours = float(working_hours) if working_hours else None
         except ValueError:
             working_hours = None
-        
+
         # Get overtime hours
         overtime_hours = request.form.get('overtime_hours', '').strip()
         try:
@@ -1445,6 +1570,26 @@ def attendance_edit(attendance_id: int):
                          attendance=attendance,
                          employees=employees,
                          today=date.today())
+
+
+@bp.route('/attendance/<int:attendance_id>', methods=['GET'])
+@login_required
+def attendance_detail(attendance_id: int):
+    """Display attendance record detail"""
+    attendance = Attendance.query.get_or_404(attendance_id)
+    employee = attendance.employee
+    shift_breakdown = attendance.get_shift_breakdown()
+    shift_labels = attendance.get_shift_breakdown_labels()
+    overtime_breakdown = attendance.get_overtime_breakdown()
+
+    return render_template(
+        'admin/attendance_detail.html',
+        attendance=attendance,
+        employee=employee,
+        shift_breakdown=shift_breakdown,
+        shift_labels=shift_labels,
+        overtime_breakdown=overtime_breakdown,
+    )
 
 
 @bp.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
@@ -1660,7 +1805,16 @@ def migrate_face_encodings():
                         skipped_count += 1
                         logger.info(f"Employee {employee.employee_code} already has multi-embeddings")
                         continue
-                    
+
+                    # Check if this face encoding already belongs to a different employee
+                    recognition = face_service.recognize_employee_multi(encoding, use_multi_embedding=True)
+                    if recognition.get('success') and recognition.get('employee_code'):
+                        matched_code = recognition['employee_code']
+                        if matched_code != employee.employee_code:
+                            logger.warning(f"Skip {employee.employee_code}: face already belongs to {matched_code}")
+                            skipped_count += 1
+                            continue
+
                     # Add to multi-embedding table
                     result = face_service.add_face_embedding(
                         employee_code=employee.employee_code,

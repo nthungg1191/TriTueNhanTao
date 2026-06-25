@@ -605,7 +605,9 @@ async function uploadShots() {
     const variants = ['default', 'profile_left', 'profile_right'];
     let ok = 0;
     let fail = 0;
-    const failedShots = [];
+    const detectFails = [];   // ảnh không detect được face
+    const dupFails = [];      // ảnh bị trùng face
+    const otherFails = [];    // lỗi khác
 
     for (let i = 0; i < shots.length; i++) {
         try {
@@ -625,23 +627,37 @@ async function uploadShots() {
                 ok++;
             } else {
                 fail++;
-                failedShots.push(shotLabels[i]);
+                if (result.error_type === 'duplicate') {
+                    dupFails.push(shotLabels[i]);
+                } else if (result.error_type === 'detect') {
+                    detectFails.push(shotLabels[i]);
+                } else {
+                    otherFails.push(shotLabels[i] + (result.message ? ` (${result.message})` : ''));
+                }
             }
         } catch (e) {
             fail++;
-            failedShots.push(shotLabels[i]);
+            otherFails.push(shotLabels[i]);
         }
     }
 
     btnUploadShots.disabled = false;
     if (ok > 0) {
+        let msg = `Lưu xong: ${ok} ảnh thành công.`;
         if (fail > 0) {
-            showFaceMessage(`Lưu xong: ${ok} ảnh thành công, ${fail} ảnh lỗi. Ảnh lỗi: ${failedShots.join(', ')}. Vui lòng chụp lại ảnh lỗi.`, 'warning');
-        } else {
-            showFaceMessage(`Lưu xong: ${ok} ảnh thành công.`, 'success');
+            const parts = [];
+            if (detectFails.length > 0) parts.push(`${detectFails.join(', ')}: không nhận diện được khuôn mặt`);
+            if (dupFails.length > 0) parts.push(`${dupFails.join(', ')}: đã có face trong hệ thống`);
+            if (otherFails.length > 0) parts.push(`${otherFails.join(', ')}`);
+            msg += ` ${fail} ảnh lỗi: ${parts.join('; ')}.`;
         }
+        showFaceMessage(msg, fail > 0 ? 'warning' : 'success');
     } else {
-        showFaceMessage('Không lưu được ảnh nào. Hãy chụp lại với ánh sáng tốt hơn.', 'error');
+        const parts = [];
+        if (detectFails.length > 0) parts.push(`${detectFails.join(', ')}: không nhận diện được khuôn mặt`);
+        if (dupFails.length > 0) parts.push(`${dupFails.join(', ')}: đã có face trong hệ thống`);
+        if (otherFails.length > 0) parts.push(otherFails.join(', '));
+        showFaceMessage(parts.length > 0 ? parts.join('; ') : 'Lưu thất bại. Không có ảnh nào được lưu.', 'error');
     }
 }
 

@@ -89,48 +89,102 @@ def _next_punch_action(attendance):
 def _resolve_time_based_action(attendance, now):
     """Pick the punch action by mapping the wall-clock time to a slot.
 
-    Rules:
-        - Before 12:00 -> ``check_in_time`` (morning check-in)
-        - 12:00 - 13:00:
-            * If ``check_in_time`` already filled -> ``check_out_time``
-              (lunch check-out).
-            * If ``check_in_time`` is empty -> ``check_in_time_2``
-              (employee skipped the morning check-in).
-        - 13:00 - 17:00:
-            * If any prior check-in exists and ``check_out_time_2`` is empty
-              -> ``check_out_time_2`` (afternoon check-out).
-        - 17:00+ and OT slots -> handled separately via OT logic.
+    Hard caps by shift (no auto-created punches):
+        - Morning shift ends at 12:00. check_out_1 is allowed any time after
+          check_in_1 and is capped at 13:00. Scanning before 12:00 with an
+          open morning shift records an early check-out.
+        - Lunch window 12:00 - 13:00: if the morning shift is still open,
+          record check_out_1; otherwise record check_in_2 (covers employees
+          who already punched out for lunch or who missed the morning shift
+          entirely).
+        - After 13:00: the morning shift's check-out window is closed. An
+          open morning shift (``check_in_time`` filled, ``check_out_time``
+          empty) is treated as missed; the current scan becomes check_in_2
+          and ``update_status()`` marks the morning as ``missing_check_out``.
+          No back-dated check-out is written.
+        - Afternoon check-out: any time after check_in_2 up to 20:00 (early
+          or on-time). OT (after 20:00) is delegated to the OT picker.
 
     Returns either a tuple ``(action_type, slot)`` for the regular slots, an
     OT action string, or ``None`` to indicate the punch should be skipped.
     """
     morning_end = now.replace(hour=12, minute=0, second=0, microsecond=0)
     lunch_end = now.replace(hour=13, minute=0, second=0, microsecond=0)
-    afternoon_end = now.replace(hour=17, minute=0, second=0, microsecond=0)
+    final_end = now.replace(hour=20, minute=0, second=0, microsecond=0)
 
+    # --- Trước 12:00 ---
     if now < morning_end:
+        # Chưa check-in sáng -> check-in sáng
         if attendance.check_in_time is None:
             return ('check-in', 1)
+        # Đã check-in sáng nhưng quét sớm trước 12:00 -> cho check-out sớm
+        if attendance.check_out_time is None:
+            return ('check-out', 1)
+        # Đã check-out sáng rồi mà quét tiếp trước 12:00 -> bỏ qua
         return None
 
+    # --- 12:00 - 13:00 ---
     if now < lunch_end:
-        if attendance.check_in_time is not None and attendance.check_out_time is None:
+        # Ca sáng đang mở (có check-in, chưa check-out) -> ưu tiên check-out
+        if (attendance.check_in_time is not None
+                and attendance.check_out_time is None):
             return ('check-out', 1)
-        if attendance.check_in_time is None and attendance.check_in_time_2 is None:
-            # Skipped the morning check-in: write to the afternoon slot.
+        # Đã check-out sáng rồi (hoặc không có check-in sáng) -> check-in chiều
+        if attendance.check_in_time_2 is None:
             return ('check-in', 2)
         return None
 
-    if now < afternoon_end:
-        has_any_checkin = (
-            attendance.check_in_time is not None
-            or attendance.check_in_time_2 is not None
-        )
-        if has_any_checkin and attendance.check_out_time_2 is None:
-            return ('check-out', 2)
+    # --- Sau 13:00 ---
+    # Ca sáng đã bỏ lỡ check-out (có check_in nhưng chưa check_out, đã quá 13:00)
+    # -> không check-out ngược, lượt quét này xử lý như check-in chiều.
+    # update_status() sẽ tự set missing_check_out cho ca sáng.
+    if (attendance.check_in_time is not None
+            and attendance.check_out_time is None):
+        if attendance.check_in_time_2 is None:
+            return ('check-in', 2)
         return None
 
-    # 17:00 and beyond: defer to OT logic (handled by caller).
+    # Ca chiều: đã check-in chiều và còn trong khung được phép check-out
+    # (13:00 - 20:00, bao gồm cả check-out sớm trước 17:00)
+    if attendance.check_in_time_2 is not None:
+        if attendance.check_out_time_2 is None and now <= final_end:
+            return ('check-out', 2)
+
+        # --- Khung chuyển tiếp 17:00 - 17:30 ---
+        # Ca chiều đã đóng (check_out_time_2 đã có). Trong khung này, ưu tiên
+        # xử lý OT dựa trên trạng thái hiện tại thay vì chỉ defer sang OT picker.
+        # Sau 17:30: deleg hoàn toàn sang _resolve_overtime_action (caller).
+        transition_start = now.replace(hour=17, minute=0, second=0, microsecond=0)
+        transition_end   = now.replace(hour=17, minute=30, second=0, microsecond=0)
+
+        if transition_start <= now < transition_end:
+            # Rule 2 & 5: ca chiều đã đóng VA đã có OT check-in -> check-out OT
+            if (attendance.overtime_check_in_time is not None
+                    and attendance.overtime_check_out_time is None):
+                return 'overtime_check-out'
+
+            # Rule 3 & 4: ca chiều đã đóng, CHƯA có OT check-in
+            if (attendance.overtime_check_in_time is None):
+                approved_ot = None
+                try:
+                    approved_ot = attendance._get_approved_overtime_request()
+                except Exception:
+                    pass
+                if approved_ot is not None:
+                    # Rule 3: ưu tiên đóng ca chiều đã xong ở trên,
+                    # đến đây = ca chiều đã đóng + chưa có OT check-in + có đăng ký
+                    # -> check-in OT (cho phép check-in sớm 17:00-17:30)
+                    return 'overtime_check-in'
+                # Rule 4: không có đăng ký tăng ca -> không tạo bản ghi OT
+                return None
+
+        return None
+
+    # Chưa có check-in nào nhưng quét sau 13:00 -> ghi check-in chiều
+    if attendance.check_in_time_2 is None:
+        return ('check-in', 2)
+
+    # 17:00+ and beyond: defer to OT logic (handled by caller).
     return None
 
 

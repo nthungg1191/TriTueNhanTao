@@ -3,6 +3,7 @@ import numpy as np
 import face_recognition
 import os
 import logging
+import traceback
 from typing import List, Tuple, Optional, Dict, Any
 from PIL import Image
 import io
@@ -56,7 +57,7 @@ class FaceDetector:
             return face_locations
             
         except Exception as e:
-            logger.error(f"Error detecting faces: {str(e)}")
+            logger.error(f"Error detecting faces: {str(e)}\n{traceback.format_exc()}")
             return []
     
     def get_face_encodings(self, image: np.ndarray, face_locations: List[Tuple[int, int, int, int]] = None) -> List[np.ndarray]:
@@ -83,7 +84,7 @@ class FaceDetector:
             return face_encodings
             
         except Exception as e:
-            logger.error(f"Error getting face encodings: {str(e)}")
+            logger.error(f"Error getting face encodings: {str(e)}\n{traceback.format_exc()}")
             return []
     
     def compare_faces(self, face_encoding: np.ndarray, known_encodings: List[np.ndarray]) -> List[bool]:
@@ -246,7 +247,7 @@ class FaceDetector:
             }
             
         except Exception as e:
-            logger.error(f"Error processing image: {str(e)}")
+            logger.error(f"Error processing image: {str(e)}\n{traceback.format_exc()}")
             return {
                 'faces_found': 0,
                 'face_locations': [],
