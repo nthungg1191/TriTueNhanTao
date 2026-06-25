@@ -9,6 +9,23 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+def get_database_url():
+    database_url = os.getenv("DATABASE_URL") or os.getenv("MYSQL_URL")
+
+    if database_url:
+        return database_url.replace("mysql://", "mysql+pymysql://", 1)
+
+    mysql_host = os.getenv("MYSQLHOST") or os.getenv("DB_HOST")
+    mysql_port = os.getenv("MYSQLPORT") or os.getenv("DB_PORT", "3306")
+    mysql_user = os.getenv("MYSQLUSER") or os.getenv("DB_USER") or os.getenv("DB_USERNAME", "root")
+    mysql_password = os.getenv("MYSQLPASSWORD") or os.getenv("DB_PASSWORD", "")
+    mysql_database = os.getenv("MYSQLDATABASE") or os.getenv("MYSQL_DATABASE") or os.getenv("DB_DATABASE") or os.getenv("DB_NAME", "railway")
+
+    if mysql_host:
+        return f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+
+    return "mysql+pymysql://root:@localhost:3306/attendance_dbx1"
+
 class Config:
     """Base configuration"""
     
@@ -23,10 +40,7 @@ class Config:
     TIMEZONE = os.getenv('TIMEZONE', 'Asia/Ho_Chi_Minh')
     
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'DATABASE_URL',
-        'mysql+pymysql://root:@localhost:3306/attendance_dbx1'
-    )
+    SQLALCHEMY_DATABASE_URI = get_database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False
     SQLALCHEMY_POOL_SIZE = 10
@@ -95,7 +109,7 @@ class ProductionConfig(Config):
     TESTING = False
     
     # Override with production database
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = get_database_url()
     
     # Stronger security in production
     SESSION_COOKIE_SECURE = True
@@ -107,7 +121,7 @@ class TestingConfig(Config):
     """Testing configuration"""
     TESTING = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:your_password@localhost:5432/your_database_name'
+    SQLALCHEMY_DATABASE_URI = get_database_url()
     WTF_CSRF_ENABLED = False
 
 
@@ -116,6 +130,6 @@ config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig
 }
 
