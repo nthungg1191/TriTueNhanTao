@@ -15,21 +15,25 @@ logger = logging.getLogger(__name__)
 
 class FaceDetector:
     """Face detection and recognition service"""
-    
+
+    ABSOLUTE_MAX_DISTANCE = 0.6
+    STRICT_TOLERANCE = 0.4
+    DEFAULT_TOLERANCE = 0.4
+
     def __init__(self, model: str = 'hog', tolerance: float = None, upsample: int = 0):
 
         if tolerance is None:
             if has_app_context():
-                tolerance = float(current_app.config.get('FACE_RECOGNITION_TOLERANCE', 0.5))
+                tolerance = float(current_app.config.get('FACE_RECOGNITION_TOLERANCE', self.DEFAULT_TOLERANCE))
             else:
-                tolerance = float(os.getenv('FACE_RECOGNITION_TOLERANCE', 0.5))
+                tolerance = float(os.getenv('FACE_RECOGNITION_TOLERANCE', self.DEFAULT_TOLERANCE))
 
         self.model = model
         self.tolerance = tolerance
         self.upsample = upsample
         self.known_face_encodings = []
         self.known_face_names = []
-        
+
         logger.info(f"FaceDetector initialized with model: {model}, tolerance: {tolerance}, upsample: {upsample}")
     
     def detect_faces(self, image: np.ndarray) -> List[Tuple[int, int, int, int]]:
@@ -117,25 +121,33 @@ class FaceDetector:
     def find_face_distance(self, face_encoding: np.ndarray, known_encodings: List[np.ndarray]) -> List[float]:
         """
         Calculate face distances
-        
+
         Args:
             face_encoding: Face encoding to compare
             known_encodings: List of known face encodings
-            
+
         Returns:
             List of face distances
         """
         try:
             if not known_encodings:
                 return []
-            
+
             distances = face_recognition.face_distance(
-                known_encodings, 
+                known_encodings,
                 face_encoding
             )
-            
-            return distances.tolist()
-            
+
+            dist_list = distances.tolist()
+
+            # Defensive: replace NaN/Inf values with max possible distance
+            for i, d in enumerate(dist_list):
+                if d != d or abs(d) == float('inf'):  # NaN check: d != d is True only for NaN
+                    logger.warning("find_face_distance: invalid distance at index %d, replacing with MAX_DISTANCE", i)
+                    dist_list[i] = self.ABSOLUTE_MAX_DISTANCE
+
+            return dist_list
+
         except Exception as e:
             logger.error(f"Error calculating face distances: {str(e)}")
             return []
@@ -143,32 +155,38 @@ class FaceDetector:
     def recognize_face(self, face_encoding: np.ndarray, known_encodings: List[np.ndarray], known_names: List[str]) -> Optional[str]:
         """
         Recognize a face from known encodings
-        
+
         Args:
             face_encoding: Face encoding to recognize
             known_encodings: List of known face encodings
             known_names: List of corresponding names
-            
+
         Returns:
             Name of recognized person or None
         """
         try:
             if not known_encodings or not known_names:
                 return None
-            
-            # Compare faces
-            matches = self.compare_faces(face_encoding, known_encodings)
-            
-            if True in matches:
-                # Find the best match
-                face_distances = self.find_face_distance(face_encoding, known_encodings)
-                best_match_index = np.argmin(face_distances)
-                
-                if face_distances[best_match_index] < self.tolerance:
-                    return known_names[best_match_index]
-            
+
+            face_distances = self.find_face_distance(face_encoding, known_encodings)
+            if not face_distances:
+                return None
+
+            best_match_index = int(np.argmin(face_distances))
+            min_distance = face_distances[best_match_index]
+
+            if min_distance >= self.ABSOLUTE_MAX_DISTANCE:
+                logger.info(
+                    "recognize_face: min_distance=%.4f >= ABSOLUTE_MAX_DISTANCE=%.4f -> reject",
+                    min_distance, self.ABSOLUTE_MAX_DISTANCE
+                )
+                return None
+
+            if min_distance < self.tolerance:
+                return known_names[best_match_index]
+
             return None
-            
+
         except Exception as e:
             logger.error(f"Error recognizing face: {str(e)}")
             return None

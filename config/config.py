@@ -72,9 +72,15 @@ class Config:
     PASSWORD_MIN_LENGTH = int(os.getenv('PASSWORD_MIN_LENGTH', 8))
     
     # Face Recognition
-    FACE_RECOGNITION_TOLERANCE = float(os.getenv('FACE_RECOGNITION_TOLERANCE', 0.6))
+    FACE_RECOGNITION_TOLERANCE = float(os.getenv('FACE_RECOGNITION_TOLERANCE', 0.4))
+    FACE_RECOGNITION_STRICT_TOLERANCE = float(os.getenv('FACE_RECOGNITION_STRICT_TOLERANCE', 0.4))
+    # Khoang cach Euclidean giua hai face encoding:
+    #   < 0.4: cung mot nguoi (same person)
+    #   0.4-0.45: chan can than (needs confirmation)
+    #   0.45-0.6: kha nhuong (different people)
+    #   >= 0.6: nguoi la (absolute rejection - never match)
     FACE_DETECTION_MODEL = os.getenv('FACE_DETECTION_MODEL', 'hog')  # 'hog' or 'cnn'
-    MAX_FACE_DISTANCE = float(os.getenv('MAX_FACE_DISTANCE', 0.6))
+    MAX_FACE_DISTANCE = float(os.getenv('MAX_FACE_DISTANCE', 0.4))
     FACE_ENCODINGS_PATH = 'face_encodings'
     
     # Camera

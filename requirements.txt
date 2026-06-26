@@ -38,3 +38,7 @@ pytz==2023.3
 
 # Export
 openpyxl==3.1.2
+
+# Performance Testing
+psutil==5.9.6
+requests==2.31.0

@@ -322,12 +322,23 @@ def _validate_employee_photo(file_storage, employee_code: str = None):
         face_service = FaceService(db.session)
 
         try:
-            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True, exclude_employee_code=employee_code)
+            from flask import current_app
+            current_app.logger.info(
+                "[VALIDATE_PHOTO:%s] Recognition result: success=%s emp_code=%s distance=%.4f",
+                employee_code, recognition.get('success'), recognition.get('employee_code'), recognition.get('distance')
+            )
             if recognition.get('success') and recognition.get('employee_code'):
                 matched_code = recognition['employee_code']
+                current_app.logger.info(
+                    "[VALIDATE_PHOTO:%s] matched_code=%s != employee_code=%s ? %s",
+                    employee_code, matched_code, employee_code, matched_code != employee_code
+                )
                 if matched_code != employee_code:
                     return image, None, 'Đã có face trong hệ thống'
-        except Exception:
+        except Exception as e:
+            from flask import current_app
+            current_app.logger.error("[VALIDATE_PHOTO:%s] Exception in recognition check: %s", employee_code, str(e))
             pass
 
         return image, face_encoding, None
@@ -394,14 +405,28 @@ def _register_face_from_employee_photo(employee_code: str, image: np.ndarray, ph
 
     # --- Duplicate face check ---
     try:
-        recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+        recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True, exclude_employee_code=employee_code)
+        from flask import current_app
+        current_app.logger.info(
+            "[REGISTER_FACE:%s] Recognition result: success=%s emp_code=%s distance=%.4f",
+            employee_code, recognition.get('success'), recognition.get('employee_code'), recognition.get('distance')
+        )
         if recognition.get('success') and recognition.get('employee_code'):
             matched_code = recognition['employee_code']
+            current_app.logger.info(
+                "[REGISTER_FACE:%s] matched_code=%s != employee_code=%s ? %s",
+                employee_code, matched_code, employee_code, matched_code != employee_code
+            )
             if matched_code != employee_code:
+                current_app.logger.warning("[REGISTER_FACE:%s] Duplicate face detected: matched=%s", employee_code, matched_code)
                 return False, 'Đã có face trong hệ thống'
             # matched_code == employee_code → same employee, allowed
-    except Exception:
-        pass  # If recognition check fails, proceed with registration
+        else:
+            current_app.logger.info("[REGISTER_FACE:%s] No duplicate found. Proceeding. success=%s emp_code=%r",
+                employee_code, recognition.get('success'), recognition.get('employee_code'))
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error("[REGISTER_FACE:%s] Exception in recognition check: %s. Allowing registration.", employee_code, str(e))
 
     legacy_result = face_service.register_employee_face(
         employee_code=employee_code,

@@ -172,6 +172,14 @@ def recognize_face():
         
         # Recognize employee using multi-embedding system
         face_service = FaceService(db.session)
+
+        # Get number of registered faces for debug info
+        try:
+            _, known_codes = face_service._get_cached_face_embeddings()
+            num_registered = len(known_codes)
+        except Exception:
+            num_registered = 0
+
         route_logger.info("[FACE_RECOGNIZE:%s] Calling face_service.recognize_employee_multi()", request_id)
         recognition_result = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
         route_logger.info("[FACE_RECOGNIZE:%s] Recognition result: %s", request_id, recognition_result)
@@ -182,17 +190,24 @@ def recognize_face():
                 recognition_result['employee_name'] = employee.name
         else:
             # Normalize unrecognized face messages for kiosk display
-            if recognition_result.get('message') in [
-                'No registered faces found',
-                'No matching face found. Please register your face.'
-            ]:
-                recognition_result['message'] = 'Nhân viên chưa có mặt trong hệ thống. Vui lòng liên hệ quản trị viên.'
+            recognition_result['message'] = 'Khong nhan dien duoc khuon mat. Vui long lien he quan tri vien.'
+
+        # Always include debug fields
+        recognition_result['min_distance'] = recognition_result.get('distance')
+        recognition_result['confidence'] = recognition_result.get('confidence')
+        recognition_result['tolerance'] = recognition_result.get('tolerance')
+        recognition_result['num_registered_faces'] = recognition_result.get('num_registered_faces', num_registered)
 
         route_logger.info(
-            "[FACE_RECOGNIZE:%s] Completed: success=%s employee_code=%s elapsed_ms=%.1f",
+            "[FACE_RECOGNIZE:%s] Completed: success=%s employee_code=%s "
+            "min_distance=%s confidence=%s tolerance=%s num_registered=%s elapsed_ms=%.1f",
             request_id,
             recognition_result.get('success'),
             recognition_result.get('employee_code'),
+            recognition_result.get('min_distance'),
+            recognition_result.get('confidence'),
+            recognition_result.get('tolerance'),
+            recognition_result.get('num_registered_faces'),
             (time.perf_counter() - start_time) * 1000,
         )
         return jsonify(recognition_result), 200
@@ -329,6 +344,7 @@ def delete_employee_face(employee_code):
 
 @face_api.route('/register-multi', methods=['POST'])
 def register_face_multi():
+    route_logger = current_app.logger
     try:
         data = request.get_json()
         
@@ -388,17 +404,52 @@ def register_face_multi():
 
         # --- Duplicate face check ---
         try:
-            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True)
+            recognition = face_service.recognize_employee_multi(face_encoding, use_multi_embedding=True, exclude_employee_code=employee_code)
+            route_logger.info(
+                "[REGISTER-MULTI:%s] Duplicate check result: success=%s matched=%s distance=%.4f tolerance=%.4f confidence=%.4f",
+                employee_code,
+                recognition.get('success'),
+                recognition.get('employee_code'),
+                recognition.get('distance'),
+                recognition.get('tolerance'),
+                recognition.get('confidence'),
+            )
+            route_logger.info(
+                "[REGISTER-MULTI:%s] Check condition: recognition['success']=%s, recognition['employee_code']=%r, employee_code=%s",
+                employee_code,
+                bool(recognition.get('success')),
+                recognition.get('employee_code'),
+                employee_code,
+            )
             if recognition.get('success') and recognition.get('employee_code'):
                 matched_code = recognition['employee_code']
+                route_logger.info(
+                    "[REGISTER-MULTI:%s] matched_code=%s != employee_code=%s ? %s -> WILL REJECT",
+                    employee_code, matched_code, employee_code, matched_code != employee_code
+                )
                 if matched_code != employee_code:
+                    route_logger.warning(
+                        "[REGISTER-MULTI:%s] Duplicate face detected: matched=%s (not self), distance=%.4f",
+                        employee_code, matched_code, recognition.get('distance')
+                    )
                     return jsonify({
                         'success': False,
-                        'message': 'Đã có face trong hệ thống',
-                        'error_type': 'duplicate'
+                        'message': 'Khuon mat nay da dang ky cho nhan vien %s' % matched_code,
+                        'error_type': 'duplicate',
+                        'employee_code': employee_code,
+                        'matched_employee_code': matched_code,
+                        'min_distance': recognition.get('distance'),
+                        'confidence': recognition.get('confidence'),
+                        'tolerance': recognition.get('tolerance'),
                     }), 409
-        except Exception:
-            pass  # If recognition check fails, proceed with registration
+            else:
+                route_logger.info(
+                    "[REGISTER-MULTI:%s] No duplicate found (or recognition failed). Proceeding with registration. success=%s emp_code=%r",
+                    employee_code, recognition.get('success'), recognition.get('employee_code')
+                )
+        except Exception as e:
+            route_logger.error("[REGISTER-MULTI:%s] Recognition check threw exception: %s. Allowing registration to proceed.", employee_code, str(e))
+            # Do NOT silently pass - log but still allow through
 
         result = face_service.add_face_embedding(
             employee_code=employee_code,

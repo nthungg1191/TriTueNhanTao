@@ -13,7 +13,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-FACE_RECOGNITION_EMBEDDING_CACHE_TTL = float(os.getenv('FACE_RECOGNITION_EMBEDDING_CACHE_TTL', 10.0))
+FACE_RECOGNITION_EMBEDDING_CACHE_TTL = float(os.getenv('FACE_EMBEDDING_CACHE_TTL', 5.0))
 _FACE_EMBEDDING_CACHE = {
     'timestamp': 0.0,
     'encodings': [],
@@ -157,71 +157,110 @@ class FaceService:
     def recognize_employee(self, face_encoding: np.ndarray) -> Dict[str, Any]:
         """
         Recognize employee from face encoding
-        
+
         Args:
             face_encoding: Face encoding to match
-            
+
         Returns:
             Recognition result
         """
         try:
-            # Get all known encodings
             known_encodings, known_employee_ids = self.get_all_face_encodings()
-            
+
             if not known_encodings:
                 return {
                     'success': False,
-                    'message': 'No registered faces found',
+                    'message': 'Khong co khuon mat nao dang ky trong he thong',
                     'employee_code': None,
-                    'confidence': 0.0
+                    'confidence': 0.0,
+                    'distance': None,
+                    'tolerance': self.face_detector.tolerance,
                 }
-            
-            # Find best match
+
             distances = self.face_detector.find_face_distance(face_encoding, known_encodings)
-            
+
             if not distances:
                 return {
                     'success': False,
-                    'message': 'Could not calculate face distances',
-                    'employee_code': None,
-                    'confidence': 0.0
-                }
-            
-            # Find minimum distance
-            min_distance = min(distances)
-            best_match_index = distances.index(min_distance)
-            
-            # Match is accepted when the distance is within tolerance.
-            if min_distance < self.face_detector.tolerance:
-                confidence = 1.0 - min_distance
-                employee_code = known_employee_ids[best_match_index]
-                
-                logger.info(f"Employee recognized: {employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
-                
-                return {
-                    'success': True,
-                    'message': 'Employee recognized',
-                    'employee_code': employee_code,
-                    'confidence': confidence,
-                    'distance': min_distance
-                }
-            else:
-                logger.info(f"No match found. Min distance: {min_distance:.3f} (tolerance: {self.face_detector.tolerance})")
-                return {
-                    'success': False,
-                    'message': 'No matching face found. Please register your face.',
+                    'message': 'Khong the tinh khoang cach khuon mat',
                     'employee_code': None,
                     'confidence': 0.0,
-                    'distance': min_distance
+                    'distance': None,
+                    'tolerance': self.face_detector.tolerance,
                 }
-                
-        except Exception as e:
-            logger.error(f"Error recognizing employee: {str(e)}")
+
+            min_distance = float(min(distances))
+            best_match_index = int(distances.index(min_distance))
+            employee_code = known_employee_ids[best_match_index]
+
+            # Build all-distance log for debugging
+            all_distances = {
+                code: float(d)
+                for code, d in zip(known_employee_ids, distances)
+            }
+            confidence = min(1.0, max(0.0, 1.0 - min_distance))
+
+            logger.info(
+                "[RECOG_LEGACY] all_distances=%s min_distance=%.4f best_match=%s "
+                "tolerance=%.4f confidence=%.4f",
+                all_distances, min_distance, employee_code,
+                self.face_detector.tolerance, confidence
+            )
+
+            # ABSOLUTE rejection: distance >= ABSOLUTE_MAX_DISTANCE -> always reject
+            if min_distance >= self.face_detector.ABSOLUTE_MAX_DISTANCE:
+                logger.info(
+                    "recognize_employee(legacy): min_distance=%.4f >= ABSOLUTE_MAX=%.4f -> TUYET DOI TU CHOI",
+                    min_distance, self.face_detector.ABSOLUTE_MAX_DISTANCE
+                )
+                return {
+                    'success': False,
+                    'message': 'Khong nhan dien duoc khuon mat. Vui long lien he quan tri vien.',
+                    'employee_code': None,
+                    'confidence': confidence,
+                    'distance': min_distance,
+                    'tolerance': self.face_detector.tolerance,
+                    'employee_code_rejected': employee_code,
+                }
+
+            # Strict match: distance < tolerance -> accept
+            if min_distance < self.face_detector.tolerance:
+                logger.info(
+                    "Employee recognized (legacy): %s confidence=%.3f distance=%.4f",
+                    employee_code, confidence, min_distance
+                )
+                return {
+                    'success': True,
+                    'message': 'Nhan dien thanh cong',
+                    'employee_code': employee_code,
+                    'confidence': confidence,
+                    'distance': min_distance,
+                    'tolerance': self.face_detector.tolerance,
+                }
+
+            # Distance >= tolerance: valid face but not matched to anyone registered
+            logger.info(
+                "No match (legacy): min_distance=%.4f tolerance=%.4f -> TU CHOI",
+                min_distance, self.face_detector.tolerance
+            )
             return {
                 'success': False,
-                'message': f'Recognition failed: {str(e)}',
+                'message': 'Khong nhan dien duoc khuon mat. Vui long lien he quan tri vien.',
                 'employee_code': None,
-                'confidence': 0.0
+                'confidence': confidence,
+                'distance': min_distance,
+                'tolerance': self.face_detector.tolerance,
+            }
+
+        except Exception as e:
+            logger.error(f"Error recognizing employee (legacy): {str(e)}")
+            return {
+                'success': False,
+                'message': f'Nhan dien that bai: {str(e)}',
+                'employee_code': None,
+                'confidence': 0.0,
+                'distance': None,
+                'tolerance': None,
             }
     
     def update_employee_face(self, employee_code: str, face_encoding: np.ndarray, 
@@ -666,86 +705,144 @@ class FaceService:
         _FACE_EMBEDDING_CACHE['timestamp'] = now
         return encodings, employee_codes
 
-    def recognize_employee_multi(self, face_encoding: np.ndarray, use_multi_embedding: bool = True) -> Dict[str, Any]:
+    def recognize_employee_multi(self, face_encoding: np.ndarray, use_multi_embedding: bool = True,
+                                  exclude_employee_code: str = None) -> Dict[str, Any]:
         """
         Recognize employee using multi-embedding system
         Compares against all embeddings and returns best match
         Falls back to legacy method if no multi-embeddings found
-        
+
         Args:
             face_encoding: Face encoding to match
             use_multi_embedding: Use multi-embedding table (True) or legacy (False)
-            
+            exclude_employee_code: Employee code to exclude from comparison (used during
+                re-registration to avoid matching against the same person's existing embeddings)
+
         Returns:
-            Recognition result
+            Recognition result with debug fields: employee_code, min_distance, tolerance, confidence
         """
         try:
             if use_multi_embedding:
-                # Get cached embeddings and refresh only after TTL expires
                 known_encodings, known_employee_codes = self._get_cached_face_embeddings()
-                
-                # Fallback to legacy if no multi-embeddings found
+
                 if not known_encodings:
                     logger.info("No multi-embeddings found, falling back to legacy method")
                     known_encodings, known_employee_codes = self.get_all_face_encodings()
             else:
-                # Use legacy method
                 known_encodings, known_employee_codes = self.get_all_face_encodings()
-            
+
+            # Filter out the target employee's own embeddings when checking for duplicates
+            if exclude_employee_code:
+                mask = [code != exclude_employee_code for code in known_employee_codes]
+                known_encodings = [enc for enc, m in zip(known_encodings, mask) if m]
+                known_employee_codes = [code for code, m in zip(known_employee_codes, mask) if m]
+
             if not known_encodings:
                 return {
                     'success': False,
-                    'message': 'No registered faces found',
+                    'message': 'Khong co khuon mat nao dang ky trong he thong',
                     'employee_code': None,
-                    'confidence': 0.0
+                    'confidence': 0.0,
+                    'distance': None,
+                    'tolerance': self.face_detector.tolerance,
                 }
-            
-            # Find best match across all embeddings
+
             distances = self.face_detector.find_face_distance(face_encoding, known_encodings)
-            
+
             if not distances:
                 return {
                     'success': False,
-                    'message': 'Could not calculate face distances',
+                    'message': 'Khong the tinh khoang cach khuon mat',
                     'employee_code': None,
-                    'confidence': 0.0
+                    'confidence': 0.0,
+                    'distance': None,
+                    'tolerance': self.face_detector.tolerance,
                 }
-            
-            # Find minimum distance
-            min_distance = min(distances)
-            best_match_index = distances.index(min_distance)
+
+            min_distance = float(min(distances))
+            best_match_index = int(distances.index(min_distance))
             best_employee_code = known_employee_codes[best_match_index]
-            
-            # Match is accepted when the distance is within tolerance.
+
+            # Build all-distance log for debugging
+            all_distances = {
+                code: float(d)
+                for code, d in zip(known_employee_codes, distances)
+            }
+            confidence = min(1.0, max(0.0, 1.0 - min_distance))
+
+            logger.info(
+                "[RECOG_DEBUG] method=%s all_distances=%s min_distance=%.4f best_match=%s "
+                "tolerance=%.4f confidence=%.4f num_known=%d",
+                'multi_embedding' if use_multi_embedding else 'legacy',
+                all_distances,
+                min_distance,
+                best_employee_code,
+                self.face_detector.tolerance,
+                confidence,
+                len(known_encodings)
+            )
+
+            # ABSOLUTE rejection: distance >= ABSOLUTE_MAX_DISTANCE -> always reject
+            if min_distance >= self.face_detector.ABSOLUTE_MAX_DISTANCE:
+                logger.info(
+                    "recognize_employee_multi: min_distance=%.4f >= ABSOLUTE_MAX=%.4f -> TUYET DOI TU CHOI (rejected=%s)",
+                    min_distance, self.face_detector.ABSOLUTE_MAX_DISTANCE, best_employee_code
+                )
+                return {
+                    'success': False,
+                    'message': 'Khong nhan dien duoc khuon mat. Vui long lien he quan tri vien.',
+                    'employee_code': None,
+                    'confidence': confidence,
+                    'distance': min_distance,
+                    'tolerance': self.face_detector.tolerance,
+                    'employee_code_rejected': best_employee_code,
+                    'num_registered_faces': len(known_encodings),
+                    'method': 'multi_embedding' if use_multi_embedding else 'legacy',
+                }
+
+            # Strict match: distance < tolerance -> accept
             if min_distance < self.face_detector.tolerance:
-                confidence = 1.0 - min_distance
-                logger.info(f"Employee recognized: {best_employee_code} (confidence: {confidence:.3f}, distance: {min_distance:.3f})")
-                
+                logger.info(
+                    "Employee recognized: %s confidence=%.4f distance=%.4f tolerance=%.4f",
+                    best_employee_code, confidence, min_distance, self.face_detector.tolerance
+                )
                 return {
                     'success': True,
-                    'message': 'Employee recognized',
+                    'message': 'Nhan dien thanh cong',
                     'employee_code': best_employee_code,
                     'confidence': confidence,
                     'distance': min_distance,
-                    'method': 'multi_embedding' if use_multi_embedding else 'legacy'
+                    'tolerance': self.face_detector.tolerance,
+                    'num_registered_faces': len(known_encodings),
+                    'method': 'multi_embedding' if use_multi_embedding else 'legacy',
                 }
-            else:
-                logger.info(f"No match found. Min distance: {min_distance:.3f}")
-                return {
-                    'success': False,
-                    'message': 'No matching face found. Please register your face.',
-                    'employee_code': None,
-                    'confidence': 0.0,
-                    'distance': min_distance
-                }
-                
+
+            # Distance >= tolerance: valid face but not matched to anyone registered
+            logger.info(
+                "No match: min_distance=%.4f >= tolerance=%.4f -> TU CHOI best_candidate=%s",
+                min_distance, self.face_detector.tolerance, best_employee_code
+            )
+            return {
+                'success': False,
+                'message': 'Khong nhan dien duoc khuon mat. Vui long lien he quan tri vien.',
+                'employee_code': None,
+                'confidence': confidence,
+                'distance': min_distance,
+                'tolerance': self.face_detector.tolerance,
+                'employee_code_rejected': best_employee_code,
+                'num_registered_faces': len(known_encodings),
+                'method': 'multi_embedding' if use_multi_embedding else 'legacy',
+            }
+
         except Exception as e:
             logger.error(f"Error recognizing employee: {str(e)}")
             return {
                 'success': False,
-                'message': f'Recognition failed: {str(e)}',
+                'message': f'Nhan dien that bai: {str(e)}',
                 'employee_code': None,
-                'confidence': 0.0
+                'confidence': 0.0,
+                'distance': None,
+                'tolerance': None,
             }
     
     def delete_face_embedding(self, embedding_id: int) -> Dict[str, Any]:
