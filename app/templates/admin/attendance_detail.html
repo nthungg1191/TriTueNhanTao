@@ -397,11 +397,16 @@
                 {% endif %}
                 &nbsp;&middot;&nbsp;
                 <span class="status-badge
-                    {% if attendance.status == 'present' %}on_time{% endif %}
-                    {% if attendance.status in ['late','early_leave'] %}late{% endif %}
-                    {% if attendance.status == 'absent' %}missing{% endif %}
-                    {% if attendance.status in ['missing_check_in','missing_check_out','missed_overtime','missed_sunday_work'] %}missing{% endif %}">
-                    {{ attendance.STATUS_LABELS.get(attendance.status, attendance.status) }}
+                    {% set any_late = (shift_breakdown.morning == 'late') or (shift_breakdown.afternoon == 'late') %}
+                    {% if attendance.status == 'absent' or any_late or (attendance.is_late_minutes or 0) > 0 %}late
+                    {% elif attendance.status == 'present' and not any_late and (attendance.is_late_minutes or 0) == 0 %}on_time
+                    {% elif attendance.status == 'early_leave' %}late
+                    {% else %}missing{% endif %}">
+                    {% if any_late or (attendance.is_late_minutes or 0) > 0 %}
+                        Có mặt - Đi muộn
+                    {% else %}
+                        {{ attendance.STATUS_LABELS.get(attendance.status, attendance.status) }}
+                    {% endif %}
                 </span>
             </div>
         </div>

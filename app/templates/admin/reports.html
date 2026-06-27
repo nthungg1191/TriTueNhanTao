@@ -195,18 +195,18 @@
                         </td>
                         <td>{{ row.working_hours }}h</td>
                         <td>
-                            {% if row.status == 'present' or row.status == 'early_leave' %}
-                                <span class="badge badge-success">Có mặt</span>
-                                {% if row.is_late %}
-                                <span class="badge badge-warning">Đi muộn</span>
-                                {% endif %}
-                                {% if row.status == 'early_leave' %}
-                                <span class="badge badge-info">Rời sớm</span>
-                                {% endif %}
-                            {% elif row.status == 'absent' %}
+                            {% if row.status == 'absent' %}
                                 <span class="badge badge-danger">Vắng mặt</span>
+                            {% elif row.status == 'early_leave' %}
+                                {% if row.is_late %}
+                                <span class="badge badge-warning">Đi làm muộn &amp; Rời sớm</span>
+                                {% else %}
+                                <span class="badge badge-info">Nghỉ sớm</span>
+                                {% endif %}
+                            {% elif row.is_late %}
+                                <span class="badge badge-warning">Đi làm muộn</span>
                             {% else %}
-                                <span class="badge badge-info">{{ row.status_label }}</span>
+                                <span class="badge badge-success">Có mặt</span>
                             {% endif %}
                         </td>
                     </tr>
