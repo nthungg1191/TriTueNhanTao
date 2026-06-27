@@ -179,22 +179,34 @@
             </thead>
             <tbody>
                 {% if report_type == 'daily' %}
-                    {% for att in report_data.attendances[:50] %}
+                    {% for row in report_data.employee_statuses %}
                     <tr>
-                        <td>{{ att.employee_name }}</td>
-                        <td>{{ att.employee_code }}</td>
-                        <td>{{ att.check_in_time.split('T')[1][:5] if att.check_in_time else 'N/A' }}</td>
-                        <td>{{ att.check_out_time.split('T')[1][:5] if att.check_out_time else 'N/A' }}</td>
-                        <td>{{ att.working_hours }}h</td>
+                        <td>{{ row.employee_name }}</td>
+                        <td>{{ row.employee_code }}</td>
                         <td>
-                            {% if att.status == 'present' %}
-                            <span class="badge badge-success">Có mặt</span>
-                            {% elif att.status == 'late' %}
-                            <span class="badge badge-warning">Đi muộn</span>
-                            {% elif att.status == 'early_leave' %}
-                            <span class="badge badge-info">Rời sớm</span>
+                            {% if row.has_any_punch %}
+                                {{ row.check_in_time.split('T')[1][:5] if row.check_in_time else '--' }}
+                            {% else %}N/A{% endif %}
+                        </td>
+                        <td>
+                            {% if row.has_any_punch %}
+                                {{ row.check_out_time.split('T')[1][:5] if row.check_out_time else '--' }}
+                            {% else %}N/A{% endif %}
+                        </td>
+                        <td>{{ row.working_hours }}h</td>
+                        <td>
+                            {% if row.status == 'present' or row.status == 'early_leave' %}
+                                <span class="badge badge-success">Có mặt</span>
+                                {% if row.is_late %}
+                                <span class="badge badge-warning">Đi muộn</span>
+                                {% endif %}
+                                {% if row.status == 'early_leave' %}
+                                <span class="badge badge-info">Rời sớm</span>
+                                {% endif %}
+                            {% elif row.status == 'absent' %}
+                                <span class="badge badge-danger">Vắng mặt</span>
                             {% else %}
-                            <span class="badge badge-danger">Vắng mặt</span>
+                                <span class="badge badge-info">{{ row.status_label }}</span>
                             {% endif %}
                         </td>
                     </tr>

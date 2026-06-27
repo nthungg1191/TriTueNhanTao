@@ -20,6 +20,7 @@ class Attendance(db.Model):
     overtime_check_in_time = db.Column(db.DateTime, nullable=True)
     overtime_check_out_time = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='present', nullable=False)  # present, absent, late, early_leave, missing_check_in, missing_check_out
+    is_late_minutes = db.Column(db.Integer, default=0, nullable=False)  # Số phút đi muộn (0 = đúng giờ); là trạng thái phụ, không ghi đè status
     working_hours = db.Column(db.Float, default=0.0)  # Hours worked
     overtime_hours = db.Column(db.Float, default=0.0)  # Overtime hours
     notes = db.Column(db.Text, nullable=True)
@@ -339,68 +340,54 @@ class Attendance(db.Model):
         return format_time_24h(self.overtime_check_out_time)
 
     def update_status(self):
-        """Update attendance status based on check-in/out times"""
-        # Standardized rules for day shift 08:00-17:00 with lunch break 12:00-13:00.
-        # Missing punches are tracked separately so they don't get mixed with
-        # present/late/early_leave.
+        """Update attendance status based on check-in/out times.
 
-        # Missing punches handling
+        Quy tắc mới:
+        - 'Có mặt' là trạng thái chính khi nhân viên có bản ghi chấm công trong ngày.
+        - 'Đi muộn' là trạng thái PHỤ, được tách riêng qua cột `is_late_minutes`.
+          KHÔNG ghi đè status='late' lên status='present'.
+        - 'Vắng mặt' chỉ khi KHÔNG có bất kỳ mốc chấm công nào trong ngày.
+        - Chấm công nửa ngày (chỉ có buổi sáng HOẶC chỉ có buổi chiều) vẫn tính là 'Có mặt'.
+        """
+        # 1) Không có mốc chấm công nào -> Vắng mặt (hoặc nhánh OT đã duyệt)
         if not self.check_in_time and not self.check_out_time and not self.check_in_time_2 and not self.check_out_time_2:
-            # Nếu có đăng ký tăng ca/làm Chủ nhật đã duyệt nhưng không chấm công tăng ca
             approved_ot = self._get_approved_overtime_request()
             if approved_ot and not self.overtime_check_in_time:
                 if self._is_sunday_work_day():
                     self.status = 'missed_sunday_work'
                 else:
                     self.status = 'missed_overtime'
+                self.is_late_minutes = 0
                 return
             self.status = 'absent'
+            self.is_late_minutes = 0
             return
 
-        if not self.check_in_time:
-            self.status = 'missing_check_in'
-            return
-
-        if self.check_in_time and not self.check_out_time:
-            self.status = 'missing_check_out'
-            return
-
-        if self.check_in_time_2 is None:
-            self.status = 'missing_check_in'
-            return
-
-        if self.check_out_time_2 is None:
-            self.status = 'missing_check_out'
-            return
+        # 2) Từ đây trở đi: nhân viên CÓ mặt (ít nhất 1 mốc chấm công).
+        #    status chính sẽ là 'present'; is_late_minutes sẽ được tính bên dưới nếu có dữ liệu.
+        self.status = 'present'
+        self.is_late_minutes = 0
 
         morning_deadline = datetime.combine(self.date, dt_time(8, 0))
         lunch_boundary = datetime.combine(self.date, dt_time(12, 0))
         lunch_return = datetime.combine(self.date, dt_time(13, 0))
         final_end = datetime.combine(self.date, dt_time(17, 0))
 
-        morning_late = self.check_in_time > morning_deadline
-        lunch_early = self.check_out_time < lunch_boundary
-        afternoon_late = self.check_in_time_2 > lunch_return
-        final_early = self.check_out_time_2 < final_end
+        # 3) Tính phút đi muộn (trạng thái phụ) - chỉ khi có dữ liệu mốc tương ứng
+        if self.check_in_time and self.check_in_time > morning_deadline:
+            delta = self.check_in_time - morning_deadline
+            self.is_late_minutes += int(delta.total_seconds() // 60)
 
-        # Apply status priority:
-        # 1) morning/afternoon late -> 'late'
-        # 2) lunch early or final early -> 'early_leave'
-        # 3) otherwise -> 'present'
+        if self.check_in_time_2 and self.check_in_time_2 > lunch_return:
+            delta = self.check_in_time_2 - lunch_return
+            self.is_late_minutes += int(delta.total_seconds() // 60)
 
-        if morning_late or afternoon_late:
-            self.status = 'late'
-            return
-
-        if lunch_early:
+        # 4) Đánh dấu nghỉ sớm nhưng vẫn giữ 'Có mặt' làm trạng thái chính
+        if (self.check_out_time and self.check_out_time < lunch_boundary) or \
+           (self.check_out_time_2 and self.check_out_time_2 < final_end):
+            # Dùng status riêng để vẫn phân biệt được nghỉ sớm; nếu muốn 'Có mặt' tuyệt đối
+            # thì có thể bỏ phần này. Hiện giữ 'early_leave' cho khớp với các báo cáo khác.
             self.status = 'early_leave'
-            return
-
-        if final_early:
-            self.status = 'early_leave'
-            return
-
-        self.status = 'present'
     
     def is_complete(self):
         """Check if both check-in and check-out are recorded"""
@@ -530,6 +517,8 @@ class Attendance(db.Model):
             ],
             'status': self.status,
             'status_label': self.get_status_label(),
+            'is_late_minutes': self.is_late_minutes or 0,
+            'is_late': (self.is_late_minutes or 0) > 0,
             'working_hours': self.working_hours,
             'working_hours_display': self.get_working_hours_display(),
             # 'overtime_hours' is stored as OT points (1.5x raw hours minus deductions)
